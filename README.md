@@ -12,3 +12,7 @@ Data can be downloaded from [pushshift](https://files.pushshift.io/reddit/submis
 
 
 ### Running a FANATIC Clustering
+
+
+## Tests
+Run tests in home directory with `python3.7 -m pytest tests/unit/`
