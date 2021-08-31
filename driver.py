@@ -1,40 +1,44 @@
 import argparse
+import fanatic.metrics
+import fanatic.output
 from fanatic.preprocess import filter_data, labels, nltk_preprocessor, read_data
 from fanatic.clustering import clusteringcomponents as cc
-from fanatic.metrics import performance
 from fanatic.clustering.config import ALGORITHM_CONFIG, CONVERGENCE_PATIENCE, CONVERGENCE_IMPROVEMENT_THRESHOLD
 import json
 import numpy as np
 import os
+import uuid
 
 import logging
 logging_format = '%(asctime)s %(filename)s %(funcName)s %(lineno)d %(levelname)s %(message)s'
 logging.basicConfig(level=logging.INFO, format=logging_format)
 logger = logging.getLogger(__name__)
 
+LARGE_INT = 100000   # arbitrary large int for picking random seeds
+
 
 def process_and_write_aggregate_results(aggregate_metrics, aggregate_stats, configuration, args, dataset_id):
     '''
     After all individual clustering runs are complete, this aggregates the stats/metrics from those runs and writes 
     them to a configparser-style file for easy loading later
+    
     Args:
         aggregate_metrics (list of dicts): list of metrics dictionaries, one per seed-job
         aggregate_stats (list of dicts): list of stats dictionaries, one per seed-job
         configuration (dict): the hyperparameters for the job
         args (argparse object): contains the input arguments for the job
         dataset_id (str): name shared across all seed-jobs
-    Returns:
-        final_metric (float): the metric that will be returned to DSP spectro (if applicable)
-    '''
-    averaged_metrics, averaged_stats = performance.average_metrics_stats_from_seed_runs(aggregate_metrics, aggregate_stats)
 
-    #output.save_averaged_results(averaged_metrics, averaged_stats, configuration, args, dataset_id)
+    '''
+    averaged_metrics, averaged_stats = fanatic.metrics.average_metrics_stats_from_seed_runs(aggregate_metrics, aggregate_stats)
+
+    fanatic.output.save_averaged_results(averaged_metrics, averaged_stats, configuration, args, dataset_id)
     
     final_metric = averaged_metrics['ami']['mean']
-    return final_metric
+    logger.info(f"final averaged ami metric={final_metric}")
 
 
-def run_clustering(args, cluster_handler, data_labels, configuration, seed_for_job, run_index, dataset_id):
+def run_clustering(args, cluster_handler, data_labels, configuration, seeds_for_job, dataset_id):
     '''
     Runs an individual clustering job, calculates metrics, saves results. 
     Args:
@@ -51,19 +55,33 @@ def run_clustering(args, cluster_handler, data_labels, configuration, seed_for_j
         cluster_stats (dict): contains all the clustering stats (elapsed time, number of clusters, etc.)
         dataset_id (str): the dataset id
     '''
+    # init
+    aggregate_metrics = []
+    aggregate_stats = []
+    
+    # perform clustering for each seed
+    for run_index, seed_for_job in enumerate(seeds_for_job):
+        logger.info(f"Beginning clustering job {run_index + 1}/{args.n_seed_jobs}...")
 
-    # cluster
-    cluster_stats = cluster_handler.cluster(seed_for_job)
+        # cluster
+        cluster_stats = cluster_handler.cluster(seed_for_job)
 
-    # aggregate results into flat lists, obtain clustering stats
-    assignments, labels, metrics = performance.aggregate_results(cluster_handler.clustering_model.documents, data_labels, cluster_stats)
+        # aggregate results into flat lists, obtain clustering stats
+        metrics = fanatic.metrics.calculate_metrics(cluster_handler.clustering_model.documents, data_labels, cluster_stats)
+        
+        # save results
+        logger.info("Saving Results")
+        setattr(args, 'job_seed', seed_for_job)     # save job seed with args
+        fanatic.output.save_results(args, data_labels, metrics, configuration,
+                                    cluster_stats, run_index, dataset_id, cluster_handler.clustering_model)
+        
+        aggregate_metrics.append(metrics)
+        aggregate_stats.append(cluster_stats)
 
-    # save results
-    #logger.info("Saving Results")
-    # dataset_id = output.save_results(cluster_handler.clustering_model, data_labels, metrics, configuration,
-    #                                  cluster_stats, args, args.save_clusteringmodel_to_hdfs,
-    #                                  run_index, dataset_id)
-    return metrics, cluster_stats, dataset_id
+        # important: clear clustering to re-use cluster_handler and keep all pre-processed data
+        cluster_handler.clear_results()
+
+    return aggregate_metrics, aggregate_stats
 
 
 def get_data_and_labels(args):
@@ -137,7 +155,7 @@ def parse_args():
                         ],
                         help='data files to load')
     parser.add_argument('--n-read', type=int,
-                        default=4000,  # TODO: change to None as default
+                        default=10000,  # TODO: change to None as default
                         help='Number of documents to read in. Default is set to `None`, which reads everything')
     parser.add_argument('--subreddit-noise-percentage', type=restricted_float,
                         default=0.2,
@@ -166,12 +184,20 @@ def parse_args():
                         default='fanatic',
                         help='algorithm to run clustering against')
     parser.add_argument('--n-seed-jobs', type=int,
-                        default=3,
+                        default=1,
                         help='Number of (different-seeded) clustering jobs to run')
     parser.add_argument('--clustering-seed', type=int,
                         default=42,
                         help='Used for generating individual clustering run seeds')   
 
+    # output arguments
+    parser.add_argument('--output-dir',
+                        type=str,
+                        default='output',
+                        help='directory for where to dump results')
+    parser.add_argument('--flag-save-clusteringmodel', action='store_true',
+                        default=False,
+                        help='If true, save pickled ClusteringModel results to hdfs (warning: It is a large file)')
 
     args = parser.parse_args()
     return args
@@ -196,31 +222,20 @@ def main():
     cluster_handler.prepare_for_clustering(featurized_data_generator, 
                                            CONVERGENCE_PATIENCE, 
                                            CONVERGENCE_IMPROVEMENT_THRESHOLD)
+    logger.info("preprocessed data")
 
-    #cluster - run `args.n_seed` clustering jobs with different seeds
-    aggregate_metrics = []
-    aggregate_stats = []
-    dataset_id = None   # dataset_id set once in run_clustering and re-used
+    # cluster
+    dataset_id = uuid.uuid4().hex
     np.random.seed(args.clustering_seed)
-    seeds_for_job = list(np.random.randint(0, 100000, args.n_seed_jobs)) # set random seeds for job
-    for run_index, seed_for_job in enumerate(seeds_for_job):
-        logger.info(f"Beginning clustering job {run_index + 1}/{args.n_seed_jobs}")
-
-        # cluster and aggregate results
-        setattr(args, 'job_seed', seed_for_job)     # add attr so it will be written with clustering results to file
-        metrics, cluster_stats, dataset_id = run_clustering(args, cluster_handler, data_labels, configuration, 
-                                                            seed_for_job, run_index, dataset_id)
-        aggregate_metrics.append(metrics)
-        aggregate_stats.append(cluster_stats)
-
-        # important: delete clustering results from current run to re-use cluster_handler and keep all pre-processed data
-        cluster_handler.clear_results()
+    seeds_for_job = list(np.random.randint(0, LARGE_INT, args.n_seed_jobs)) # set random seeds for job
+    aggregate_metrics, aggregate_stats = run_clustering(args, cluster_handler, data_labels, configuration, seeds_for_job, dataset_id)
+    logger.info("clustered data")
 
     # average and write aggregate results
     setattr(args, 'job_seeds', seeds_for_job)    # add all seeds as list attr so will be written to aggregate results
-    delattr(args, 'job_seed')                    # this attribute was only relevant for individual jobs
-    final_metric = process_and_write_aggregate_results(aggregate_metrics, aggregate_stats, configuration, args, dataset_id)
-    print(final_metric)
+    process_and_write_aggregate_results(aggregate_metrics, aggregate_stats, configuration, args, dataset_id)
+    logger.info("Successful completion of clustering.")
+
 
 if __name__ == '__main__':
     main()

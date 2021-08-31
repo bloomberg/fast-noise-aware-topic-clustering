@@ -7,8 +7,7 @@ setup(
     author_email='asilburt@bloomberg.net',
     description='FAst Noise-Aware TopIc Clustering',
     url='https://bbgithub.dev.bloomberg.com/adsk-ml-experiments/FANATIC',
-    packages=['fanatic', 'fanatic.algorithms', 'fanatic.labels_and_metrics',
-              'fanatic.preprocess', 'fanatic.clustering', 'fanatic.embedding'],
+    packages=['fanatic', 'fanatic.preprocess', 'fanatic.clustering'],
     install_requires=[
         'python_version >= "3.7"',
         'gensim==4.0',

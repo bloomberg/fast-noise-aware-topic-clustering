@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 NO_ASSIGNMENT = 'NO_ASSIGNMENT' # label to assign to documents that did not fall into a cluster
 
 
-def aggregate_results(doc_assignments, data_labels, cluster_stats):
+def calculate_metrics(doc_assignments, data_labels, cluster_stats):
     '''
     Convert clustering results (and labels) into two simple flat lists of clustering assignment / label, so they
     can be easily consumed by sklearn.metrics. Additionally this function calculates a number of stats to print and
@@ -72,13 +72,13 @@ def aggregate_results(doc_assignments, data_labels, cluster_stats):
     # report stats
     report_stats(cluster_stats, cluster_ids, number_of_tp, number_of_fp, number_of_tn, number_of_fn)
 
-    # calculate metrics, add others if desired
+    # calculate metrics (additional metrics can be added if desired)
     ami_score = adjusted_mutual_info_score(document_labels, document_assignments, average_method='arithmetic')
     metrics = {
         "ami": ami_score
     }
 
-    return document_assignments, document_labels, metrics
+    return metrics
 
 
 def report_stats(cluster_stats, cluster_ids, number_of_tp, number_of_fp, number_of_tn, number_of_fn):
