@@ -106,7 +106,6 @@ def prepare_titles_and_labels(data, subreddit_labels):
                     "text": title["text"],
                     "id": title["id"],
                     "label": derived_label,
-                    "subreddit": subreddit,
                 }
             )
     return all_titles, all_derived_labels

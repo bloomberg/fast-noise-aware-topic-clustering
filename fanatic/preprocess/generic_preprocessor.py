@@ -1,5 +1,5 @@
 from abc import ABC
-from typing import Dict, List
+from typing import Any, Dict, Generator, List
 
 
 class GenericPreprocessor(ABC):
@@ -8,7 +8,7 @@ class GenericPreprocessor(ABC):
     def __init__(self):
         pass
 
-    def preprocess(self, documents: List[str]) -> Dict[str, List[str]]:
+    def preprocess(self, data: List[Dict[str, Any]]) -> Generator[Dict[str, Any], None, None]:
         """Preprocess the documents.
         'document_tokens' field must be present in output as they are used during clustering
         """

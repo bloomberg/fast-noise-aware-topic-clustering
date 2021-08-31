@@ -6,7 +6,7 @@ FAst Noise-Aware TopIc Clustering
 
 ## How-to
 ### Downloading the Reddit Data
-Data can be downloaded from [pushshift](https://files.pushshift.io/reddit/submissions/) using `wget`, e.g. `wget https://files.pushshift.io/reddit/submissions/RS_2011-01.zst`. 
+Data can be downloaded from [pushshift](https://files.pushshift.io/reddit/submissions/) using `wget`, e.g. `wget https://files.pushshift.io/reddit/submissions/RS_2017-11.zst`. 
 
 ### Training a Word2vec Embedding
 

@@ -1,17 +1,23 @@
 from fanatic.preprocess.nltk_preprocessor import NLTKPreprocessor
 
+DATA_INPUT = [
+        {"text": "I ate 10 hotdogs at the baseball game. What about yourself?"},
+        {"text": "What is the Meaning of life????"},
+    ]
+PREPROCESSOR_OUTPUT = [{'text': 'I ate 10 hotdogs at the baseball game. What about yourself?', 'tokens': ['ate', '10', 'hotdogs', 'baseball', 'game'], 'norm_tokens': ['ate', '__NUMBER__', 'hotdogs', 'baseball', 'game']}, {'text': 'What is the Meaning of life????', 'tokens': ['meaning', 'life'], 'norm_tokens': ['meaning', 'life']}]
 
 def test_nltk_preprocessor():
     # GIVEN
-    documents = [
-        "I am myself and you are yourself",
-        "What is the Meaning of life????",
-    ]
+    data = DATA_INPUT
 
     # WHEN
     engine = NLTKPreprocessor()
-    preprocessed_documents = engine.preprocess(documents)
+    preprocessed_data_generator = engine.preprocess(data)
+    preprocessed_data = list(preprocessed_data_generator)
 
     # THEN
-    assert "document_tokens" in preprocessed_documents.keys()
-    assert preprocessed_documents["document_tokens"] == [[], ["meaning", "life"]]
+    assert preprocessed_data == PREPROCESSOR_OUTPUT
+
+
+def test_nltk_featurizer():
+    pass
