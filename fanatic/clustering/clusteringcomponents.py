@@ -3,65 +3,68 @@ import collections
 import time
 
 import logging
-logging_format = '%(asctime)s %(filename)s %(funcName)s %(lineno)d %(levelname)s %(message)s'
+
+logging_format = (
+    "%(asctime)s %(filename)s %(funcName)s %(lineno)d %(levelname)s %(message)s"
+)
 logging.basicConfig(level=logging.INFO, format=logging_format)
 logger = logging.getLogger(__name__)
 
 
 class ClusterHandler:
-    
     def __init__(self, configuration):
-        cluster_algorithm = configuration['algorithm']
+        cluster_algorithm = configuration["algorithm"]
         self.clustering_model = cluster_algorithm()
         self.clustering_model.consume_config(configuration)
-   
+
     def add_documents(self, featurized_data):
-        ''' Create the documents to be clustered from the featurized data
-        
-        Args: 
+        """Create the documents to be clustered from the featurized data
+
+        Args:
             featurized_data: A list of featurized data
                              (must contain `id`, `text`, `clustering_tokens`, `embedding`)
-        '''
+        """
         for i, datum in enumerate(featurized_data):
             if i % 1000 == 0:
-                logger.info(f'Adding document {i}...')
+                logger.info(f"Adding document {i}...")
             self.clustering_model.add_document(datum)
 
+    def prepare_for_clustering(
+        self, featurized_data, convergence_patience, convergence_improvement_threshold
+    ):
+        # logger.info('Initializing model')
+        # self.clustering_model.set_embedding_model(embedding_model)
+        # self.clustering_model.set_filter_words(stop_words)
 
-    def prepare_for_clustering(self, featurized_data, convergence_patience, convergence_improvement_threshold):
-        #logger.info('Initializing model')
-        #self.clustering_model.set_embedding_model(embedding_model)
-        #self.clustering_model.set_filter_words(stop_words)
-
-        logger.info('Converting data into Documents')
+        logger.info("Converting data into Documents")
         self.add_documents(featurized_data)
 
-        logger.info('Setting document weights')
+        logger.info("Setting document weights")
         self.clustering_model.set_document_weights()
 
-        logger.info('Setting Convergence (Clustering) limits')
-        self.clustering_model.set_convergence_limits(convergence_patience, convergence_improvement_threshold)
-
+        logger.info("Setting Convergence (Clustering) limits")
+        self.clustering_model.set_convergence_limits(
+            convergence_patience, convergence_improvement_threshold
+        )
 
     def cluster(self, seed):
-        logger.info('Clustering')
+        logger.info("Clustering")
         stats = self.clustering_model.cluster(seed)
-        logger.info('Clustered')
+        logger.info("Clustered")
         return stats
 
-
     def clear_results(self):
-        '''
-        Reset clusters and document assignments. Important to do after each individual 
+        """
+        Reset clusters and document assignments. Important to do after each individual
         clustering run if you are re-using cluster handler for another clustering run
-        '''
+        """
         # re-initialize convergence
         self.clustering_model._previous_best_metric_value = None
         self.clustering_model._patience_counter = 0
 
         # clear stats
         self.clustering_model.stats = {}
-        
+
         # clear results
         self.clustering_model.clusters = []
         for key, document in self.clustering_model.documents.items():
@@ -69,7 +72,7 @@ class ClusterHandler:
 
 
 class Document:
-    '''Class encapulating data for a document
+    """Class encapulating data for a document
     Attributes:
         tokens (:obj:`list` of :obj:`str`): Tokens within the document
         document_ids (:obj:`list` of :obj:`str`): List of document ids
@@ -78,7 +81,7 @@ class Document:
         weight (int): weight of this document when computing averages over groups of documents
         cluster (:obj:`Cluster`): cluster to which this document belongs
         dist_to_cluster_center (float): distance fom the document to its cluster in embedding space
-    '''
+    """
 
     def __init__(self, tokens, vector):
         self.tokens = tokens
@@ -97,12 +100,12 @@ class Document:
 
 
 class Cluster:
-    '''Class encapulating data for a cluster of documents
+    """Class encapulating data for a cluster of documents
     Attributes:
         cluster_id (str): 32-characher string uniquely identifying this cluster
         center (:obj:`np.array`): cluster cener in embedding space
         documents (:obj:`list` of :obj:`Document`): Document objects which belong to this cluster
-    '''
+    """
 
     def __init__(self, cluster_id, documents):
         self.cluster_id = cluster_id
@@ -111,57 +114,63 @@ class Cluster:
         self.documents = documents
 
     def calculate_center(self):
-        '''Calculate and set the center of the cluster
+        """Calculate and set the center of the cluster
         Calculates and sets the center of the cluster from the documents in the cluster
         using a weighted average of the document vectors.
-        '''
+        """
 
         if len(self.documents) == 0:
             self.center = None
             self.token_probability = {}
         else:
-            self.center = np.average([doc.vector for doc in self.documents],
-                                     axis=0,
-                                     weights=[doc.weight for doc in self.documents])
+            self.center = np.average(
+                [doc.vector for doc in self.documents],
+                axis=0,
+                weights=[doc.weight for doc in self.documents],
+            )
             token_ctr = collections.defaultdict(float)
             for document in self.documents:
                 for token in document.tokens:
                     token_ctr[token] += document.weight
             num_documents = sum(document.weight for document in self.documents)
-            self.token_probability = {k: v/num_documents for k, v in token_ctr.items()}
+            self.token_probability = {
+                k: v / num_documents for k, v in token_ctr.items()
+            }
 
     def get_document_ids(self):
-        '''Return document ids of all documents in cluster
+        """Return document ids of all documents in cluster
         Returns:
             :obj:`list` of str: A list of document ids which are contained in this cluster
-        '''
+        """
 
-        document_ids = [document_id
-                        for document in self.documents
-                        for document_id in document.document_ids]
+        document_ids = [
+            document_id
+            for document in self.documents
+            for document_id in document.document_ids
+        ]
         return document_ids
 
-
     def size(self):
-        '''
+        """
         Get the number of documents in the cluster
         Returns:
             n_documents (int): The number of documents in the cluster
-        '''
+        """
         n_documents = sum(len(document.document_ids) for document in self.documents)
         return n_documents
 
 
 class ClusteringModel:
-    '''Class encapulating data for a clustering model
+    """Class encapulating data for a clustering model
     Attributes:
         documents (:obj:`map` from :obj:`frozenset` of str to :obj:`Document`): documents to be clustered, keys are the tokens in the document
         clusters (:obj:`list` of :obj:`Cluster`): clusters in this model
-    '''
+    """
 
     def __init__(self):
         self.documents = {}
         self.clusters = []
+        self.stats = {}
 
     def add_document(self, datum):
         # frozenset so that tokens can become the key
@@ -169,18 +178,21 @@ class ClusteringModel:
 
         # add datum to document
         if document_tokens not in self.documents:
-            self.documents[document_tokens] = Document(document_tokens, datum["embedding"])
+            self.documents[document_tokens] = Document(
+                document_tokens, datum["embedding"]
+            )
         document = self.documents[document_tokens]
-        document.document_ids.append(datum['id'])
-        document.raw_texts.append(datum['text'])
+        document.document_ids.append(datum["id"])
+        document.raw_texts.append(datum["text"])
 
     def set_document_weights(self):
-        '''Set the weight for each document which is the number of ids.
-        '''
+        """Set the weight for each document which is the number of ids."""
         for document in self.documents.values():
             document.weight = len(document.document_ids)
 
-    def set_convergence_limits(self, convergence_patience, convergence_improvement_threshold):
+    def set_convergence_limits(
+        self, convergence_patience, convergence_improvement_threshold
+    ):
         self._patience = convergence_patience
         self._convergence_improvement_threshold = convergence_improvement_threshold
         # initialize
@@ -188,7 +200,7 @@ class ClusteringModel:
         self._patience_counter = 0
 
     def check_convergence(self, metric):
-        '''
+        """
         Checks for convergence. Assumes that the metric is trying to be minimzed, and that
         all metric values are positive. This is an equivalent principle to "early stopping",
         i.e. stop the algorithm if it has not improved in self._patience iterations
@@ -196,12 +208,12 @@ class ClusteringModel:
             metric (float): metric trying to be minimized
         Return:
             has_converged (bool): whether the algorithm has converged or not
-        '''
+        """
         has_converged = False
         if self._previous_best_metric_value is None:
             self._previous_best_metric_value = metric
         else:
-            d_metric = self._previous_best_metric_value - metric    #delta_metric
+            d_metric = self._previous_best_metric_value - metric  # delta_metric
             if d_metric > self._convergence_improvement_threshold:
                 # current metric is less than previous
                 self._previous_best_metric_value = metric
@@ -212,68 +224,9 @@ class ClusteringModel:
         return has_converged
 
     def consume_config(self):
-        '''This needs to be implemented by derived classes
-        '''
+        """This needs to be implemented by derived classes"""
         pass
 
     def cluster(self):
-        '''This needs to be implemented by derived classes
-        '''
+        """This needs to be implemented by derived classes"""
         pass
-
-
-class ClusteringStats:
-    def __init__(self):
-        self.n_max_cluster_iterations = 0
-        self.cluster_center_change = []
-        self.n_docs_unassigned_to_cluster = []
-        self.n_docs_assigned_to_cluster = []
-        self.convergence_reached = False
-        self.avg_distance_final_doc_reassignment = []
-        self.n_docs_assigned_to_cluster_counter = 0
-        self.n_clusters_merged_per_cluster_iteration = []
-        self.document_assignment_times = []
-        self.time_doc_assignment = 0
-
-    def beginning_of_document_assignment(self):
-        self.n_docs_assigned_to_cluster_counter = 0
-        self.time_doc_assignment = time.time()
-
-    def assigned_document_counter(self):
-        self.n_docs_assigned_to_cluster_counter += 1
-
-    def check_max_clusters_reached(self, max_num_clusters, logger):
-        self.n_max_cluster_iterations += 1
-        logger.info(f"Max number of clusters={max_num_clusters} reached this iteration")
-
-    def end_of_document_assignment(self, logger, n_documents):
-        document_assignment_time = time.time() - self.time_doc_assignment
-        logger.info(f"document assignment time = {document_assignment_time}")
-        self.document_assignment_times.append(document_assignment_time)
-        self.n_docs_unassigned_to_cluster.append(n_documents - self.n_docs_assigned_to_cluster_counter)
-        self.n_docs_assigned_to_cluster.append(self.n_docs_assigned_to_cluster_counter)
-
-    def log_merge_count(self, n_clusters_merged):
-        self.n_clusters_merged_per_cluster_iteration.append(n_clusters_merged)
-
-    def record_cluster_center_change(self, cluster_center_change):
-        self.cluster_center_change.append(cluster_center_change)
-
-
-    def end_of_assignment(self, n_clusters_diff_filtering, reassigned_doc_cnt, number_of_final_clusters, n_documents):
-        self.n_docs_unassigned_to_cluster.append(n_documents - self.n_docs_assigned_to_cluster_counter)
-        self.n_docs_assigned_to_cluster.append(self.n_docs_assigned_to_cluster_counter)
-        self.n_clusters_diff_filtering = n_clusters_diff_filtering
-        self.reassigned_doc_cnt = reassigned_doc_cnt
-        self.cluster_stats = {
-            'number_of_cluster_iterations': len(self.cluster_center_change),
-            'number_of_iterations_with_max_clusters_exceeded': self.n_max_cluster_iterations,
-            'n_docs_unassigned_per_cluster_iteration': self.n_docs_unassigned_to_cluster,
-            'n_docs_assigned_per_cluster_iteration': self.n_docs_assigned_to_cluster,
-            'n_clusters_embed_merged_per_iteration': self.n_clusters_merged_per_cluster_iteration,
-            'cluster_center_change': self.cluster_center_change,
-            'number_of_final_clusters': number_of_final_clusters,
-            'convergence_reached': self.convergence_reached,
-            'number_of_clusters_filtered': n_clusters_diff_filtering,
-            'document_assignment_iteration_times': self.document_assignment_times
-        }

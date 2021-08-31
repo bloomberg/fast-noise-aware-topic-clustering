@@ -8,7 +8,9 @@ class GenericPreprocessor(ABC):
     def __init__(self):
         pass
 
-    def preprocess(self, data: List[Dict[str, Any]]) -> Generator[Dict[str, Any], None, None]:
+    def preprocess(
+        self, data: List[Dict[str, Any]]
+    ) -> Generator[Dict[str, Any], None, None]:
         """Preprocess the documents.
         'document_tokens' field must be present in output as they are used during clustering
         """

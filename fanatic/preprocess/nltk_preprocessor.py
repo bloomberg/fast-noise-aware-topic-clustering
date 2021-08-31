@@ -6,7 +6,7 @@ from typing import Any, Dict, Generator, List
 import re
 from gensim.models import KeyedVectors
 
-NUM_RE = re.compile(r'\d+[A-Za-z]{,2}')
+NUM_RE = re.compile(r"\d+[A-Za-z]{,2}")
 
 
 class NLTKPreprocessor(GenericPreprocessor):
@@ -14,18 +14,23 @@ class NLTKPreprocessor(GenericPreprocessor):
         # https://www.nltk.org/api/nltk.tokenize.html
         self.tokenizer = RegexpTokenizer(r"\w+")
         self.stopwords = stopwords.words("english")
-        self.embedding_model = KeyedVectors.load_word2vec_format(embedding_model_file, binary=False)
+        self.embedding_model = KeyedVectors.load_word2vec_format(
+            embedding_model_file, binary=False
+        )
         self.min_required_valid_tokens = min_required_valid_tokens
         super().__init__()
 
-    def preprocess(self, data: List[Dict[str, Any]]) -> Generator[Dict[str, Any], None, None]:
+    def preprocess(
+        self, data: List[Dict[str, Any]]
+    ) -> Generator[Dict[str, Any], None, None]:
         for d in data:
             text = d["text"]
-            d["tokens"] = [
-                tok
-                for tok in self.tokenizer.tokenize(text.lower())
+            d["tokens"] = [tok for tok in self.tokenizer.tokenize(text.lower())]
+            d["norm_tokens"] = [
+                "__NUMBER__" if NUM_RE.match(tok) else tok
+                for tok in d["tokens"]
+                if tok not in self.stopwords
             ]
-            d["norm_tokens"] = ['__NUMBER__' if NUM_RE.match(tok) else tok for tok in d["tokens"] if tok not in self.stopwords]
             yield d
 
     def _get_averaged_embedding(self, clustering_tokens):
@@ -33,7 +38,9 @@ class NLTKPreprocessor(GenericPreprocessor):
         averaged_vector = np.average(vecs, axis=0)
         return averaged_vector
 
-    def embed(self, preprocessed_data_generator: Generator[Dict[str, Any], None, None]) -> Generator[Dict[str, Any], None, None]:
+    def embed(
+        self, preprocessed_data_generator: Generator[Dict[str, Any], None, None]
+    ) -> Generator[Dict[str, Any], None, None]:
         for d in preprocessed_data_generator:
             embedding_tokens = [
                 tok for tok in d["norm_tokens"] if tok in self.embedding_model
@@ -43,9 +50,11 @@ class NLTKPreprocessor(GenericPreprocessor):
                 d["embedding"] = self._get_averaged_embedding(embedding_tokens)
                 yield d
 
-    def featurize(self, data: List[Dict[str, Any]]) -> Generator[Dict[str, Any], None, None]:
+    def featurize(
+        self, data: List[Dict[str, Any]]
+    ) -> Generator[Dict[str, Any], None, None]:
         """Combination of preprocess and embed. The required fields for downstream clustering are:
-            `id`, `text`, `clustering_tokens`, `embedding`
+        `id`, `text`, `clustering_tokens`, `embedding`
         """
         preprocessed_data_generator = self.preprocess(data)
         embedding_data_generator = self.embed(preprocessed_data_generator)
