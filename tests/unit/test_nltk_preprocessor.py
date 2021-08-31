@@ -9,9 +9,9 @@ PREPROCESSOR_OUTPUT = [{'text': 'I ate 10 hotdogs at the baseball game. What abo
 def test_nltk_preprocessor():
     # GIVEN
     data = DATA_INPUT
+    engine = NLTKPreprocessor()
 
     # WHEN
-    engine = NLTKPreprocessor()
     preprocessed_data_generator = engine.preprocess(data)
     preprocessed_data = list(preprocessed_data_generator)
 
@@ -20,4 +20,6 @@ def test_nltk_preprocessor():
 
 
 def test_nltk_featurizer():
-    pass
+    # GIVEN
+    data = DATA_INPUT
+    engine = NLTKPreprocessor()

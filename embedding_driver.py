@@ -55,8 +55,7 @@ if __name__ == '__main__':
                         ],
                         help='data files to use for training w2v')
     parser.add_argument('--n-read', type=int,
-                        default=1000,  # TODO: remove
-                        #default=None,  # reads everything
+                        default=None,  # reads everything
                         help='Initial seed used for shuffling docs each cluster iteration')
     parser.add_argument('--min-sentence-length', type=int,
                         default=3,
