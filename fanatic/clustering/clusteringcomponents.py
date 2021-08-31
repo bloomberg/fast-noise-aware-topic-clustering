@@ -8,19 +8,6 @@ logging.basicConfig(level=logging.INFO, format=logging_format)
 logger = logging.getLogger(__name__)
 
 
-def get_filtered_tokens(title, embedding_model, filter_words):
-    filtered_title_tokens = [token for token in title['norm_tokens']
-                             if token in embedding_model
-                             and token not in filter_words]
-    return filtered_title_tokens
-
-
-def get_averaged_embedding(filtered_title_tokens, embedding_model):
-    vecs = [embedding_model[token] for token in filtered_title_tokens]
-    averaged_vector = np.average(vecs, axis=0)
-    return averaged_vector
-
-
 class ClusterHandler:
     
     def __init__(self, configuration):
@@ -28,35 +15,29 @@ class ClusterHandler:
         self.clustering_model = cluster_algorithm()
         self.clustering_model.consume_config(configuration)
    
-    def add_titles(self, featurized_titles, min_required_title_tokens=3):
-        ''' Add each title to clustering model
+    def add_documents(self, featurized_data):
+        ''' Create the documents to be clustered from the featurized data
         
         Args: 
-            featurized_titles: A list of featurized titles
-                             (must contain id, text, norm_tokens, lemmas, and pos_tags)
-            min_sentence_length: The minimum length of a sentence for it to be considered in clustering
+            featurized_data: A list of featurized data
+                             (must contain `id`, `text`, `clustering_tokens`, `embedding`)
         '''
-        n_invalid_titles = 0
-        for i, title in enumerate(featurized_titles):
+        for i, datum in enumerate(featurized_data):
             if i % 1000 == 0:
-                logger.info('Adding sentence {}...'.format(i))
-
-            if title.get('valid'):
-                self.clustering_model.add_title(title, min_required_title_tokens)
-            else:
-                n_invalid_titles += 1
-        logger.info(f"Filtered out {n_invalid_titles} invalid titles")
+                logger.info(f'Adding document {i}...')
+            self.clustering_model.add_document(datum)
 
 
-    def preprocess(self, featurized_titles, embedding_model, stop_words, min_sentence_length, 
-                   convergence_patience, convergence_improvement_threshold):
-        logger.info('Initializing model')
-        self.clustering_model.set_embedding_model(embedding_model)
-        self.clustering_model.set_filter_words(stop_words)
+    def prepare_for_clustering(self, featurized_data, convergence_patience, convergence_improvement_threshold):
+        #logger.info('Initializing model')
+        #self.clustering_model.set_embedding_model(embedding_model)
+        #self.clustering_model.set_filter_words(stop_words)
 
-        logger.info('Adding titles')
-        self.add_titles(featurized_titles, min_sentence_length)
-        logger.info('Added titles')
+        logger.info('Converting data into Documents')
+        self.add_documents(featurized_data)
+
+        logger.info('Setting document weights')
+        self.clustering_model.set_document_weights()
 
         logger.info('Setting Convergence (Clustering) limits')
         self.clustering_model.set_convergence_limits(convergence_patience, convergence_improvement_threshold)
@@ -99,11 +80,11 @@ class Document:
         dist_to_cluster_center (float): distance fom the document to its cluster in embedding space
     '''
 
-    def __init__(self, tokens):
+    def __init__(self, tokens, vector):
         self.tokens = tokens
+        self.vector = vector
         self.document_ids = []
         self.raw_texts = []
-        self.vector = []
         self.weight = 0
         self.cluster = None
         self.cluster_id = None
@@ -180,47 +161,23 @@ class ClusteringModel:
 
     def __init__(self):
         self.documents = {}
-        self._filter_words = []
         self.clusters = []
 
-    def set_embedding_model(self, embedding_model):
-        '''Set the word2model to be used for clustering
-        Args:
-            embedding_model (:obj:`map` from str to :obj:`np.array`): map from tokens to word2vc vectors
-        '''
-
-        self._embedding_model = embedding_model
-
-    def set_filter_words(self, filter_words):
-        '''Set words to be ignored when clustering
-        Set the lemmas whose corresponding tokens should be removed/ignored when clustering.
-        Args:
-            filter_words (:obj:`list` of str): list of lemmas to ignore
-        '''
-        self._filter_words = set(filter_words)
-
-    def add_title(self, title, min_required_title_tokens):
-
-        filtered_title_tokens = get_filtered_tokens(title, self._embedding_model, self._filter_words)
+    def add_document(self, datum):
         # frozenset so that tokens can become the key
-        filtered_title_tokens = frozenset(filtered_title_tokens)
+        document_tokens = frozenset(datum["clustering_tokens"])
 
-        # add title to document
-        if len(filtered_title_tokens) >= min_required_title_tokens:
-            if filtered_title_tokens not in self.documents:
-                self.documents[filtered_title_tokens] = Document(filtered_title_tokens)
-            document = self.documents[filtered_title_tokens]
-            document.document_ids.append(title['id'])
-            document.raw_texts.append(title['text'])
+        # add datum to document
+        if document_tokens not in self.documents:
+            self.documents[document_tokens] = Document(document_tokens, datum["embedding"])
+        document = self.documents[document_tokens]
+        document.document_ids.append(datum['id'])
+        document.raw_texts.append(datum['text'])
 
-    def _get_vectors(self):
-        '''Calculate and set the vector for each document
-        Calculate and set the vector for each document.
-        The vector is the average of the embedding embeddings of all valid tokens within the document.
+    def set_document_weights(self):
+        '''Set the weight for each document which is the number of ids.
         '''
         for document in self.documents.values():
-            # get average embedding of tokens in document
-            document.vector = get_averaged_embedding(document.tokens, self._embedding_model)
             document.weight = len(document.document_ids)
 
     def set_convergence_limits(self, convergence_patience, convergence_improvement_threshold):

@@ -6,12 +6,32 @@ from fanatic.clustering.config import ALGORITHM_CONFIG, CONVERGENCE_PATIENCE, CO
 import json
 import numpy as np
 import os
-from gensim.models import KeyedVectors
 
 import logging
 logging_format = '%(asctime)s %(filename)s %(funcName)s %(lineno)d %(levelname)s %(message)s'
 logging.basicConfig(level=logging.INFO, format=logging_format)
 logger = logging.getLogger(__name__)
+
+
+def process_and_write_aggregate_results(aggregate_metrics, aggregate_stats, configuration, args, dataset_id):
+    '''
+    After all individual clustering runs are complete, this aggregates the stats/metrics from those runs and writes 
+    them to a configparser-style file for easy loading later
+    Args:
+        aggregate_metrics (list of dicts): list of metrics dictionaries, one per seed-job
+        aggregate_stats (list of dicts): list of stats dictionaries, one per seed-job
+        configuration (dict): the hyperparameters for the job
+        args (argparse object): contains the input arguments for the job
+        dataset_id (str): name shared across all seed-jobs
+    Returns:
+        final_metric (float): the metric that will be returned to DSP spectro (if applicable)
+    '''
+    averaged_metrics, averaged_stats = performance.average_metrics_stats_from_seed_runs(aggregate_metrics, aggregate_stats)
+
+    #output.save_averaged_results(averaged_metrics, averaged_stats, configuration, args, dataset_id)
+    
+    final_metric = averaged_metrics['ami']['mean']
+    return final_metric
 
 
 def run_clustering(args, cluster_handler, data_labels, configuration, seed_for_job, run_index, dataset_id):
@@ -36,12 +56,7 @@ def run_clustering(args, cluster_handler, data_labels, configuration, seed_for_j
     cluster_stats = cluster_handler.cluster(seed_for_job)
 
     # aggregate results into flat lists, obtain clustering stats
-    assignments, labels, assignments_exclude_tn, labels_exclude_tn = \
-        performance.aggregate_results(cluster_handler.clustering_model.documents, data_labels, cluster_stats,
-                                      prepare_results_excluding_tn_flag=True)
-
-    # calculate metrics
-    metrics = performance.calculate_metrics(assignments, labels, assignments_exclude_tn, labels_exclude_tn)
+    assignments, labels, metrics = performance.aggregate_results(cluster_handler.clustering_model.documents, data_labels, cluster_stats)
 
     # save results
     #logger.info("Saving Results")
@@ -80,8 +95,7 @@ def get_data_and_labels(args):
     # load data
     logger.info(f'Loading inquiries')
     data = read_data.read_files(args.data_files, 
-                                #n_read=n_read_from_data_files,
-                                n_read=4000,  # TODO: remove
+                                n_read=n_read_from_data_files,
                                 min_sentence_length=args.min_sentence_length,
                                 subreddit_labels_list=subreddit_labels_list)
 
@@ -126,7 +140,7 @@ def parse_args():
                         default=4000,  # TODO: change to None as default
                         help='Number of documents to read in. Default is set to `None`, which reads everything')
     parser.add_argument('--subreddit-noise-percentage', type=restricted_float,
-                        default=0.5,
+                        default=0.2,
                         help='controls the percentage of "no"/("yes" + "no") annotated subreddits. '
                              'Requires --subreddit-labels-file argument to be specified'
                              'Leave defaul="None" to disregard this feature (and not use any specific noise ratio)')
@@ -139,7 +153,7 @@ def parse_args():
 
     # preprocessing arguments
     parser.add_argument('--embedding-model-file', type=str,
-                        default='word2vec_w5_s300_RS_2017-10_2M.txt', 
+                        default='w2v_reddit_s300_w5_sg1.txt', 
                         help='embedding model file')
     parser.add_argument('--min-sentence-length', type=int,
                         default=3,
@@ -167,24 +181,23 @@ def main():
     # parse input arguments
     args = parse_args()
 
+    # load configuration and init cluster handler
+    configuration = ALGORITHM_CONFIG[args.cluster_algorithm]
+    cluster_handler = cc.ClusterHandler(configuration)
+    logger.info(f"Init cluster handler with configuration Values: {configuration}")
+
     # get data and labels
     data, data_labels = get_data_and_labels(args)
-
-    # load configuration
-    configuration = ALGORITHM_CONFIG[args.cluster_algorithm]
-    logger.info(f"Configuration Values: {configuration}")
-
-    # init cluster handler
-    cluster_handler = cc.ClusterHandler(configuration)
+    logger.info("gathered data")
 
     # preprocess data
-    embedding_model = KeyedVectors.load_word2vec_format(args.embedding_model_file, binary=False)
-    engine = nltk_preprocessor.NLTKPreprocessor()
+    engine = nltk_preprocessor.NLTKPreprocessor(args.embedding_model_file)
     featurized_data_generator = engine.featurize(data)
-    cluster_handler.preprocess(featurized_data_generator, embedding_model, args.stop_words, args.min_sentence_length,
-                               CONVERGENCE_PATIENCE, CONVERGENCE_IMPROVEMENT_THRESHOLD)
+    cluster_handler.prepare_for_clustering(featurized_data_generator, 
+                                           CONVERGENCE_PATIENCE, 
+                                           CONVERGENCE_IMPROVEMENT_THRESHOLD)
 
-    # cluster - run `args.n_seed` clustering jobs with different seeds
+    #cluster - run `args.n_seed` clustering jobs with different seeds
     aggregate_metrics = []
     aggregate_stats = []
     dataset_id = None   # dataset_id set once in run_clustering and re-used
@@ -203,6 +216,11 @@ def main():
         # important: delete clustering results from current run to re-use cluster_handler and keep all pre-processed data
         cluster_handler.clear_results()
 
+    # average and write aggregate results
+    setattr(args, 'job_seeds', seeds_for_job)    # add all seeds as list attr so will be written to aggregate results
+    delattr(args, 'job_seed')                    # this attribute was only relevant for individual jobs
+    final_metric = process_and_write_aggregate_results(aggregate_metrics, aggregate_stats, configuration, args, dataset_id)
+    print(final_metric)
 
 if __name__ == '__main__':
     main()

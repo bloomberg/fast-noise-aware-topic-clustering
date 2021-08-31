@@ -224,7 +224,7 @@ class FanaticClusterModel(ClusteringModel):
             document_keys (list of frozensets): Each frozenset is the key for each document
         '''
 
-        self._get_vectors()
+        #self._get_vectors()
 
         # initialize clusters
         # all documents belong to same cluster

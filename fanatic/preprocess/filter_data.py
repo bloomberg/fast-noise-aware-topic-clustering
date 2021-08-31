@@ -61,8 +61,8 @@ def filter_data_by_noise_percentage(
     )  # avoid potential off-by-1 errors
     if n_required_valid_titles > n_valid_docs:
         logger.warning(
-            f"Not enough actual valid documents to fulfill n_read={n_read}, noise={subreddit_noise_percentage} "
-            f"Required valid docs = {n_required_valid_titles}, actual = {n_valid_docs}."
+            f"Not enough actual valid documents to fulfill n_read={n_read} and noise percentage={100 * subreddit_noise_percentage}% since "
+            f"Required valid docs = {n_required_valid_titles}, actual = {n_valid_docs}. "
             f"Reducing total number of read documents to maintain noise percentage"
         )
         n_required_valid_titles = n_valid_docs
