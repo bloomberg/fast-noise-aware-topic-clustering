@@ -34,6 +34,14 @@ class NLTKPreprocessor(GenericPreprocessor):
     def preprocess(
         self, data: List[Dict[str, Any]]
     ) -> Generator[Dict[str, Any], None, None]:
+        """Preprocess the data.
+
+        Args:
+            data: the dataset
+
+        Returns:
+            (generator)
+        """
         for d in data:
             text = d["text"]
             d["tokens"] = [tok for tok in self.tokenizer.tokenize(text.lower())]
@@ -45,6 +53,14 @@ class NLTKPreprocessor(GenericPreprocessor):
             yield d
 
     def _get_averaged_embedding(self, clustering_tokens: List[str]) -> np.ndarray:
+        """Get an embedding for each token, and the perform a simple average to get sentence-embedding.
+
+        Args:
+            clustering_tokens: the list of tokens to be embedded
+
+        Returns:
+            averaged_vector: the sentence-embedding.
+        """
         vecs = [self.embedding_model[token] for token in clustering_tokens]
         averaged_vector = np.average(vecs, axis=0)
         return averaged_vector
@@ -52,6 +68,14 @@ class NLTKPreprocessor(GenericPreprocessor):
     def embed(
         self, preprocessed_data_generator: Generator[Dict[str, Any], None, None]
     ) -> Generator[Dict[str, Any], None, None]:
+        """Embed the preprocessed data.
+
+        Args:
+            preprocessed_data_generator: the preprocessed data generator
+
+        Returns:
+            (generator)
+        """
         if self.embedding_model is None:
             raise ValueError("No embedding model file was provided during init, cannot featurize data using nltk preprocessor.")
 
@@ -67,8 +91,14 @@ class NLTKPreprocessor(GenericPreprocessor):
     def featurize(
         self, data: List[Dict[str, Any]]
     ) -> Generator[Dict[str, Any], None, None]:
-        """Combination of preprocess and embed. The required fields for downstream clustering are:
-        `id`, `text`, `clustering_tokens`, `embedding`
+        """Combination of preprocess and embed. Generates the required fields for downstream clustering:
+            `id`, `text`, `clustering_tokens`, `embedding`.
+
+        Args:
+            data: the dataset
+
+        Returns:
+            (generator)
         """
         if self.embedding_model is None:
             raise ValueError("No embedding model file was provided during init, cannot featurize data using nltk preprocessor.")

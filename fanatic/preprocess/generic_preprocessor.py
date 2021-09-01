@@ -10,7 +10,7 @@ class GenericPreprocessor(ABC):
 
     def preprocess(
         self, data: List[Dict[str, Any]]
-    ) -> Generator[Dict[str, Any], None, None]:
+    ):
         """Preprocess the documents.
         'document_tokens' field must be present in output as they are used during clustering
         """
@@ -18,8 +18,20 @@ class GenericPreprocessor(ABC):
 
     def embed(
         self, preprocessed_documents: Dict[str, List[str]]
-    ) -> Dict[str, List[float]]:
+    ):
         """Take the preprocessed documents and embed them.
         'document_embeddings' field must be present in output as they are used during clustering
+        """
+        raise NotImplementedError
+
+    def featurize(
+        self, data: List[Dict[str, Any]]
+    ):
+        """Featurize the data. This function is directly called by the clustering_driver.py. 
+        Importantly, each featurized data point must contain the following fields:
+            - `id`: a unique identifier associated with each data point 
+            - `text`: the raw input text
+            - `clustering_tokens`: the (preprocessed) tokens that will be input to clustering
+            - `embedding`: the embedding associated with the data point.
         """
         raise NotImplementedError

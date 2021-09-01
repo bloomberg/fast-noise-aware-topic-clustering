@@ -11,9 +11,6 @@ logging_format = (
 logging.basicConfig(level=logging.INFO, format=logging_format)
 logger = logging.getLogger(__name__)
 
-# fields to skip writing to results file
-ARGS_WRITE_SKIP_FIELDS = ["stop_words"]
-
 
 def write_cluster_samples(
     clustering_model, labels, write_path, max_write_per_cluster=10
@@ -54,7 +51,7 @@ def write_metrics(write_name, metrics, hypers, cluster_stats, args):
 
     config = configparser.ConfigParser()
     config["HYPERS"] = hypers
-    config["GENERAL_ARGS"] = {arg: getattr(args, arg) for arg in vars(args)}
+    config["GENERAL_ARGS"] = {arg: str(getattr(args, arg)) for arg in vars(args)}
     config["CLUSTER_STATS"] = cluster_stats
     config["METRICS"] = metrics
     with open(write_name, "w") as configfile:
@@ -120,7 +117,7 @@ def save_results(
     )
 
     # write cluster stats
-    results_file = f"{basename}_results.txt"
+    results_file = f"{basename}_summary.txt"
     write_metrics(results_file, metrics, configuration, cluster_stats, args)
 
     # write cluster samples
@@ -147,6 +144,6 @@ def save_averaged_results(
     results_file = _get_output_basename(
         args.output_dir, dataset_id
     )
-    results_file += f"_results_averaged.txt"
+    results_file += f"_summary_averaged.txt"
 
     write_metrics(results_file, averaged_metrics, configuration, averaged_stats, args)

@@ -50,7 +50,7 @@ if __name__ == '__main__':
     parser.add_argument('--data-files', type=str,
                         nargs='+',
                         default=[
-                            "data/RS_2017-11.zst",
+                            "../data/RS_2017-11.zst",
                         ],
                         help='data files to use for training w2v')
     parser.add_argument('--n-read', type=int,
@@ -61,7 +61,7 @@ if __name__ == '__main__':
                         help='Minimum number of words in a sentence for the sentence to be used in clustering; \
                         the first sentence in an inquiry with at least min_valid_tokens words will be used.')
     parser.add_argument('--output-file', type=str,
-                        default='w2v_reddit_s300_w5_sg1_RS_2017-11.txt')
+                        default='../data/w2v_reddit_s300_w5_sg1_RS_2017-11.txt')
 
     # restrict embedding data universe to the categories of interest
     parser.add_argument('--subreddit-labels-file', type=str,

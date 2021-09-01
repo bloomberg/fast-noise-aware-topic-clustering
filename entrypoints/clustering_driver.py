@@ -90,7 +90,7 @@ def get_data_and_labels(args: argparse.Namespace) -> Tuple[List[Dict], Dict]:
     This is the general high-level function surrounding all things related to data and labels. Specifically it includes:
         - loading annotation labels to be used to validate the clustering results (if annotation_labels_file is provided)
         - Reading in the data
-        - Achieving a specific ratio of "valid" (subreddits annotated as 'yes') vs. "noise" (subreddits annotated as "no")
+        - Achieving a specific ratio of "coherent" (subreddits annotated as 'yes') vs. "noise" (subreddits annotated as "no")
           subreddits (given that `subreddit_noise_percentage` is not None and `n_read` is not None)
     '''
 
@@ -119,7 +119,7 @@ def get_data_and_labels(args: argparse.Namespace) -> Tuple[List[Dict], Dict]:
                                 min_valid_tokens=args.min_valid_tokens,
                                 subreddit_labels_list=subreddit_labels_list)
 
-    # if there is a desired valid/noise subreddit percentage specified, filter here
+    # if there is a desired coherent/noise subreddit percentage specified, filter here
     if subreddit_noise_percentage is not None and args.n_read is not None:
         logger.info(f'Filtering data according to subreddit_noise_percentage={subreddit_noise_percentage}')
         data = filter_data.filter_data_by_noise_percentage(data, 
@@ -128,8 +128,8 @@ def get_data_and_labels(args: argparse.Namespace) -> Tuple[List[Dict], Dict]:
                                                            subreddit_labels,
                                                            args.seed_data_subsample)
 
-    # flatten dataset
-    data, data_labels = labels.prepare_titles_and_labels(data, subreddit_labels)
+    # prepare final data and labels
+    data, data_labels = labels.prepare_final_dataset_and_labels(data, subreddit_labels)
 
     return data, data_labels
 
@@ -137,6 +137,7 @@ def get_data_and_labels(args: argparse.Namespace) -> Tuple[List[Dict], Dict]:
 def main():
     # parse input arguments
     args = parse_args()
+    logger.info(f"arguments: {args}")
 
     # load configuration and init cluster handler
     configuration = build_algorithm_config(args)
@@ -165,8 +166,9 @@ def main():
     aggregate_metrics, aggregate_stats = run_clustering(args, cluster_handler, data_labels, configuration, seeds_for_job, dataset_id)
     logger.info("clustered data")
 
-    # average and write aggregate results
+    # write aggregate results
     setattr(args, 'job_seeds', seeds_for_job)    # add all seeds as list attr so will be written to aggregate results
+    delattr(args, 'job_seed')                    # this attribute was only relevant for individual jobs
     process_and_write_aggregate_results(aggregate_metrics, aggregate_stats, configuration, args, dataset_id)
     logger.info("Successful completion of clustering.")
 

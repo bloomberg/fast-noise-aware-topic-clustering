@@ -57,7 +57,7 @@ class ClusterHandler:
         clustering run if you are re-using cluster handler for another clustering run
         """
         # re-initialize convergence
-        self.clustering_model._previous_best_metric_value: Optional[float] = None
+        self.clustering_model._previous_best_metric_value = None
         self.clustering_model._patience_counter = 0
 
         # clear stats
@@ -209,7 +209,7 @@ class ClusteringModel:
         """
         has_converged = False
         if self._previous_best_metric_value is None:
-            self._previous_best_metric_value = metric
+            self._previous_best_metric_value = metric  # type: ignore
         else:
             d_metric = self._previous_best_metric_value - metric  # delta_metric
             if d_metric > self._convergence_improvement_threshold:

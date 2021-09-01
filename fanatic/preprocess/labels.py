@@ -1,26 +1,22 @@
+"""All functions associated with assigning labels to the input data."""
 import json
 import logging
-from typing import Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
 NOISE_LABEL = "NOISE_LABEL"  # label to assign to noise subreddits
-VALID_SUBREDDIT_ANNOTATION_VALUE = True
-NOISE_SUBREDDIT_ANNOTATION_VALUE = False
 DEFAULT_MAX_N_READ_FOR_NOISE_FILTER = 10000000  # just a very large number
 
 
 def load_subreddit_labels(subreddit_labels_file: str) -> Dict[str, str]:
-    """
-    load mapping between subreddit and label. 'noise' subreddits get a NOISE_LABEL, and 'valid'
-    subreddits get the appropriate label (see get_derived_clustering_label() function for details)
+    """Load mapping between subreddit and label. Noise subreddits get a NOISE_LABEL and otherwise the subreddit is the label.
 
     Args:
-        subreddit_labels_file (str): filepath of the subreddit_labels file
+        subreddit_labels_file (str): Filepath of the subreddit_labels file
 
     Returns:
-        subreddit_labels (dict): (key, value) -> (subreddit, derived_label). See `get_derived_clustering_label()` for
-                                  more info on `derived_label`.
+        subreddit_labels: Contains the subreddit / label mapping.
     """
     # stats
     unique_derived_labels = set()
@@ -49,24 +45,21 @@ def load_subreddit_labels(subreddit_labels_file: str) -> Dict[str, str]:
     return subreddit_labels
 
 
-def prepare_titles_and_labels(data: Dict[str, List], subreddit_labels: Dict[str, str]) -> Tuple[List[Dict], Dict[str, str]]:
-    """
-    prepare titles and labels for clustering. Specifically use label to determine a 'derived' label
-    - i.e. if it was a valid cluster, the label = subreddit, else label = NOISE_LABEL
+def prepare_final_dataset_and_labels(data: Dict[str, Any], subreddit_labels: Optional[Dict[str, str]] = None) -> Tuple[List[Dict], Dict[str, str]]:
+    """Prepare dataset and labels for clustering. Determine a 'derived' label from the subreddit_labels.
 
     Args:
-        data (dict): The read data
-        subreddit_labels (dict or None): key/value -> (subreddit, label). See get_label() in
-                                          annotations.py to see how `label` is assigned
+        data: The dataset
+        subreddit_labels: Contains the subreddit / label mapping when specified
 
     Returns:
-        all_titles (List of dicts): the data in proper format for downstream clustering
-        all_derived_labels (dict): key/value -> (id, derived_label)
+        final_data: the data in proper format for downstream clustering
+        final_derived_labels: contains a mapping between datum id and derived label.
     """
-    all_derived_labels = {}
-    all_titles = []
-    for subreddit, titles in data.items():
-        for title in titles:
+    final_derived_labels = {}
+    final_data = []
+    for subreddit, data in data.items():
+        for title in data:
             # if we have annotations available, use them to get a more informed label,
             # otherwise use the subreddit as the label
             derived_label = (
@@ -76,12 +69,12 @@ def prepare_titles_and_labels(data: Dict[str, List], subreddit_labels: Dict[str,
             )
 
             # prepare title / label
-            all_derived_labels[title["id"]] = derived_label
-            all_titles.append(
+            final_derived_labels[title["id"]] = derived_label
+            final_data.append(
                 {
                     "text": title["text"],
                     "id": title["id"],
                     "label": derived_label,
                 }
             )
-    return all_titles, all_derived_labels
+    return final_data, final_derived_labels

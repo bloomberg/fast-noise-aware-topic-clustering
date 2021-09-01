@@ -1,6 +1,7 @@
+"""Functions associated with filtering the data according to a specified noise percentage."""
 import logging
 import random
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple
 
 from fanatic.preprocess.labels import NOISE_LABEL
 
@@ -13,103 +14,90 @@ def filter_data_by_noise_percentage(
     subreddit_noise_percentage: float,
     subreddit_labels: Dict,
     seed: int,
-) -> Dict[str, List]:
+) -> Dict[str, Any]:
     """
-    This filters data to achieve a specified 'noise ratio'. From our annotation task, we determined that some
-    subreddits are 'valid' (they represent a coherent topic) and some are 'noise' (they do not represent a coherent
-    topic). This function allows the data to be filtered such that exactly `n_read` number of documents are read with
-    a `subreddit_noise_percentage` percent of them being noise subreddits
+    Filter the dataset to achieve the specified noise percentage. Honor the specified `n_read` value if possible, but the noise percentage is prioritzed.
 
     Args:
-        data: the data
-        n_read: how much data to read
-        subreddit_noise_percentage: Fraction of noise to read. Must be between 0-1
-        subreddit_labels: key/value -> (subreddit, annotation=(yes, no)). Determines which subreddits are valid/noise
-        seed: random seed for shuffling valid/noise docs
+        data: The data
+        n_read: Number of documents the final dataset should contain.
+        subreddit_noise_percentage: Fraction of noise to read.
+        subreddit_labels: Contains the subreddit / label mapping
+        seed: Random seed used for shuffling the dataset.
 
     Returns:
-        filtered_data (dict): The filtered data with the appropriate noise percentage
+        filtered_data: The filtered data with the appropriate noise percentage and (if possible) number of documents
     """
 
-    # ensure noise percentage in [0,1]
-    if subreddit_noise_percentage > 1 or subreddit_noise_percentage < 0:
-        logger.info(
-            f"subreddit_noise_percentage={subreddit_noise_percentage}, limiting to range=[0,1]"
-        )
-        subreddit_noise_percentage = max(min(subreddit_noise_percentage, 1), 0)
-
-    # separate valid and noise data
+    # separate coherent and noise data
     (
-        valid_data,
-        valid_subreddit_names,
+        coherent_data,
+        coherent_subreddit_names,
         noise_data,
         noise_subreddit_names,
-    ) = _separate_valid_and_noise_data(data, subreddit_labels)
+    ) = _separate_coherent_and_noise_data(data, subreddit_labels)
 
-    # create and shuffle valid/noise indices
+    # create and shuffle coherent/noise indices
     random.seed(seed)
-    valid_indices = list(range(len(valid_data)))
+    coherent_indices = list(range(len(coherent_data)))
     noise_indices = list(range(len(noise_data)))
-    random.shuffle(valid_indices)
+    random.shuffle(coherent_indices)
     random.shuffle(noise_indices)
 
-    # calculate number of valid/noise titles you require based on how valid many docs were *actually* read
-    n_valid_docs = len(valid_indices)
-    n_required_valid_titles = int(n_read - subreddit_noise_percentage * n_read)
-    n_required_noise_titles = n_read - n_required_valid_titles
+    # calculate number of coherent/noise titles you require based on how coherent many docs were *actually* read
+    n_coherent_docs = len(coherent_indices)
+    n_required_coherent_titles = int(n_read - subreddit_noise_percentage * n_read)
+    n_required_noise_titles = n_read - n_required_coherent_titles
     n_required_noise_titles = min(
         max(n_required_noise_titles, 0), n_read
     )  # avoid potential off-by-1 errors
-    if n_required_valid_titles > n_valid_docs:
+    if n_required_coherent_titles > n_coherent_docs:
         logger.warning(
-            f"Not enough actual valid documents to fulfill n_read={n_read} and noise percentage={100 * subreddit_noise_percentage}% since "
-            f"Required valid docs = {n_required_valid_titles}, actual = {n_valid_docs}. "
+            f"Not enough actual coherent documents to fulfill n_read={n_read} and noise percentage={100 * subreddit_noise_percentage}% since "
+            f"Required coherent docs = {n_required_coherent_titles}, actual = {n_coherent_docs}. "
             f"Reducing total number of read documents to maintain noise percentage"
         )
-        n_required_valid_titles = n_valid_docs
+        n_required_coherent_titles = n_coherent_docs
         n_required_noise_titles = int(
-            n_required_valid_titles
+            n_required_coherent_titles
             * subreddit_noise_percentage
             / (1 - subreddit_noise_percentage)
         )
 
-    # select required number of valid/noise docs
-    valid_indices = valid_indices[:n_required_valid_titles]
+    # select required number of coherent/noise docs
+    coherent_indices = coherent_indices[:n_required_coherent_titles]
     noise_indices = noise_indices[:n_required_noise_titles]
 
     # get filtered data
     filtered_data: Dict[str, Any] = {}
     counts_by_label: Dict[str, int] = {}
     _add_data_to_filtered_set(
-        filtered_data, counts_by_label, valid_data, valid_subreddit_names, valid_indices
+        filtered_data, counts_by_label, coherent_data, coherent_subreddit_names, coherent_indices
     )
     _add_data_to_filtered_set(
         filtered_data, counts_by_label, noise_data, noise_subreddit_names, noise_indices
     )
 
     # log some stats
-    n_valid_titles = len(valid_indices)
+    n_coherent_titles = len(coherent_indices)
     n_noise_titles = len(noise_indices)
-    actual_noise_percentage = n_noise_titles / (n_noise_titles + n_valid_titles)
+    actual_noise_percentage = n_noise_titles / (n_noise_titles + n_coherent_titles)
     logger.info(f"noise percentage achieved = {actual_noise_percentage}.")
-    logger.info(f"Total number of documents={n_noise_titles + n_valid_titles}")
+    logger.info(f"Total number of documents={n_noise_titles + n_coherent_titles}")
     print(f"Breakdown of counts by subreddit:", counts_by_label)
     return filtered_data
 
 
-def _add_data_to_filtered_set(filtered_data, counts_by_label, data, labels, indices):
-    """
-    Add data to the filtered set
+def _add_data_to_filtered_set(filtered_data: Dict[str, Any], counts_by_label: Dict[str, int], data: List[Dict[str, Any]], labels: List[str], indices: List[int]):
+    """Add data to the filtered set.
 
     Args:
-        filtered_data (dict of lists): The filtered set. (key, value) -> (subreddit, list of titles)
-        counts_by_label (dict): (key, value) -> (subreddit, number of titles in `filtered_data` for this subreddit)
-        data (list of titles): These are the valid or noise titles to be added to the filtered_data
-        labels (list of str): These are the corresponding labels for `data`
-        indices (list of ints): These are (randomly shuffled) indices to insert into `filtered_data`
+        filtered_data: The filtered data with the appropriate noise percentage.
+        counts_by_label: Tracks the number of counts per label
+        data: List of coherent or noise data
+        labels: Corresponding labels for `data`
+        indices: These are (randomly shuffled) indices to insert into `filtered_data`.
 
-    Returns:
-        (nothing officially, but filtered_data is filled)
     """
     for index in indices:
         label = labels[index]
@@ -122,28 +110,27 @@ def _add_data_to_filtered_set(filtered_data, counts_by_label, data, labels, indi
             counts_by_label[label] += 1
 
 
-def _separate_valid_and_noise_data(data, subreddit_labels):
+def _separate_coherent_and_noise_data(data: Dict[str, List], subreddit_labels: Dict[str, str]) -> Tuple[List[Dict[str, Any]], List[str], List[Dict[str, Any]], List[str]]:
     """
-    Separate the valid from noise titles
+    Separate the coherent from noise titles
 
     Args:
-        data (dict of dicts): (key, value) -> (subreddit, dict of titles for that subreddit)
-        subreddit_labels (dict): (key, value) -> (subreddit, label).
-                                  `label` is either the subreddit name or NOISE_LABEL
+        data: The data. Each subreddit key contains a list of titles for that subreddit.
+        subreddit_labels: Contains the subreddit / label mapping.
 
     Returns:
-        valid_data (list of dicts): each item is a subreddit title from a valid subreddit
-        valid_subreddit_names (list of str): the subreddit corresponding to the item in `valid_data`
-        noise_data (list of dicts): each item is a subreddit title from a noise subreddit
-        noise_subreddit_names (list of str): the subreddit corresponding to the item in `noise_data`
+        coherent_data: each item is a subreddit datum from a coherent subreddit
+        coherent_subreddit_names: the subreddit corresponding to the item in `coherent_data`
+        noise_data: each item is a subreddit datum from a noise subreddit
+        noise_subreddit_names: the subreddit corresponding to the item in `noise_data`
     """
     # initialize
-    valid_data = []
-    valid_subreddit_names = []
+    coherent_data = []
+    coherent_subreddit_names = []
     noise_data = []
     noise_subreddit_names = []
 
-    # separate valid from noise titles
+    # separate coherent from noise titles
     for subreddit, titles in data.items():
         subreddit_names = [subreddit] * len(titles)
         label = subreddit_labels[subreddit]
@@ -151,6 +138,6 @@ def _separate_valid_and_noise_data(data, subreddit_labels):
             noise_data += titles
             noise_subreddit_names += subreddit_names
         else:
-            valid_data += titles
-            valid_subreddit_names += subreddit_names
-    return valid_data, valid_subreddit_names, noise_data, noise_subreddit_names
+            coherent_data += titles
+            coherent_subreddit_names += subreddit_names
+    return coherent_data, coherent_subreddit_names, noise_data, noise_subreddit_names

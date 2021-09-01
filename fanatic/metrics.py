@@ -1,3 +1,4 @@
+"""Functions associated with calculating final clustering stats and metrics."""
 import logging
 import random
 import uuid
@@ -23,33 +24,28 @@ NO_ASSIGNMENT = (
 
 
 def calculate_metrics(clustered_documents: Dict[FrozenSet, Document], data_labels: Dict[str, str], cluster_stats: Dict[str, Any]) -> Dict[str, float]:
-    """
-    Convert clustering results (and labels) into two simple flat lists of clustering assignment / label, so they
-    can be easily consumed by sklearn.metrics. Additionally this function calculates a number of stats to print and
-    save to file.
+    """Calculate final metrics and clustering stats.
+
     Args:
-        clustered_documents (dict): This is the cluster_handler.clustering_model.documents object from clusteringalgos.py
-        data_labels (dict): These are the subreddit labels. They are `derived` since (if the proper flags are set)
-                               their label is determined from the annotations (either the subreddit name or
-                               NOISE_LABEL). See `label_generation.get_derived_clustering_label()` for more info
-        cluster_stats (dict): This is filled with stats during clustering.
+        clustered_documents: The clustered documents
+        data_labels: document_id / label mapping for the clustered documents
+        cluster_stats: contains some stats aggregated during clustering and further filled here. 
 
     Returns:
-        document_assignments (list): list of cluster assignments for each document
-        document_labels (list): corresponding list of derived labels for each document
+        metrics: the final calculated metrics
     """
     # main arrays
     document_assignments = []
     document_labels = []
 
     # stats
-    number_of_tp = 0  # number of valid docs in clusters
+    number_of_tp = 0  # number of coherent docs in clusters
     number_of_fp = 0  # number of noise docs in clusters
     number_of_fn = (
-        0  # number of valid docs that were unassigned (i.e. in the noise cluster)
+        0  # number of coherent docs that did not fall in a cluster
     )
     number_of_tn = (
-        0  # number of noise docs that were unassigned (i.e. in the noise cluster)
+        0  # number of noise docs that did not fall in a cluster
     )
     cluster_ids = []
 
@@ -82,7 +78,7 @@ def calculate_metrics(clustered_documents: Dict[FrozenSet, Document], data_label
                     number_of_tn += 1
 
     # report stats
-    report_stats(
+    calculate_cluster_stats(
         cluster_stats,
         cluster_ids,
         number_of_tp,
@@ -100,12 +96,18 @@ def calculate_metrics(clustered_documents: Dict[FrozenSet, Document], data_label
     return metrics
 
 
-def report_stats(
+def calculate_cluster_stats(
     cluster_stats: Dict[str, Any], cluster_ids: List[str], number_of_tp: int, number_of_fp: int, number_of_tn: int, number_of_fn: int
 ) -> None:
-    """
-    This prints the stats in the log file (for quickly scanning) and also adds fields to `cluster_stats`
-    which is eventually written to a metrics file for downstream analysis
+    """Calculate the final clustering stats.
+
+    Args:
+        cluster_stats: dict to be filled with the calculated stats
+        cluster_ids: list of the unique cluster ids
+        number_of_tp: number of "true positives"
+        number_of_fp: number of "false positives"
+        number_of_tn: number of "true negatives"
+        number_of_fn: number of "false negatives"
     """
     logger.info("*** Performance Cluster Stats ***")
 
@@ -147,8 +149,8 @@ def report_stats(
     # document clustered stats
     n_documents = number_of_tp + number_of_fp + number_of_tn + number_of_fn
 
-    # number of docs that had a valid subreddit label (and should have ended up in a cluster)
-    number_of_valid_labels = number_of_tp + number_of_fn
+    # number of docs that had a coherent subreddit label (and should have ended up in a cluster)
+    number_of_coherent_labels = number_of_tp + number_of_fn
 
     # number of documents that actually ended up in a cluster
     number_of_documents_in_clusters = number_of_tp + number_of_fp
@@ -172,8 +174,8 @@ def report_stats(
 
     documents_stats = {
         "n_total_documents": n_documents,
-        "n_valid_labels": number_of_valid_labels,
-        "valid_labels_fraction": number_of_valid_labels / n_documents,
+        "n_coherent_labels": number_of_coherent_labels,
+        "coherent_labels_fraction": number_of_coherent_labels / n_documents,
         "n_docs_clustered": number_of_documents_in_clusters,
         "docs_clustered_fraction": number_of_documents_in_clusters / n_documents,
         "n_tp": number_of_tp,

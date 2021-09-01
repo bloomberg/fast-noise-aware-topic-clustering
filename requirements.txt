@@ -1,5 +1,0 @@
-gensim==4.0
-nltk
-numpy==1.20.0
-scipy
-zstandard

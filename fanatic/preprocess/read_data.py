@@ -1,3 +1,4 @@
+"""Functions for reading in data."""
 import json
 import logging
 import sys
@@ -11,10 +12,10 @@ logging_format = (
 logging.basicConfig(level=logging.INFO, format=logging_format)
 logger = logging.getLogger(__name__)
 
-# field definitions for reddit data
-REDDIT_DATASET_INPUT_FIELD = "title"
-REDDIT_DATASET_LABEL_FIELD = "subreddit"
-REDDIT_DATASET_ID_FIELD = "id"
+# dataset field definitions
+DATASET_INPUT_FIELD = "title"           # defines the field containing the input text
+DATASET_LABEL_FIELD = "subreddit"       # defines the field containing the label
+DATASET_ID_FIELD = "id"                 # defines the field containing the unique identifier
 
 
 def read_file(
@@ -24,18 +25,17 @@ def read_file(
     min_valid_tokens: int = 3,
     subreddit_labels_list: Optional[List] = None,
 ) -> int:
-    """
-    Read a (reddit) zst data file
+    """Read a zst data file.
+
     Args:
-        data_file (string): file path
-        data (dict): where the read data is stored
-        n_read (int or None): Number of *valid* lines to read (filtered lines don't count). Set to None to read everything
-        min_valid_tokens (int): Titles with fewer than this are automatically filtered out
-        subreddit_labels_list (list or None): When specified, it is a list of subreddits, and only titles from these
-                                          subreddits are considered (everything else is filtered)
+        data_file: File path to data file
+        data: Dict to store data
+        n_read: Number of valid lines to read (filtered lines don't count). Set to None to read everything
+        min_valid_tokens: minimum number of tokens required to add to the dataset.
+        subreddit_labels_list: When specified, restrict the data universe to these labels
+
     Returns:
-        read_lines (int): Number of read lines
-        (data) (dict): Although not explicitly returned, this is filled and used downstream
+        read_lines (int): Number of valid read lines
     """
 
     # init tracking variables
@@ -66,14 +66,14 @@ def read_file(
                     try:
                         json_line = json.loads(line)
                         title = str(
-                            json_line[REDDIT_DATASET_INPUT_FIELD]
+                            json_line[DATASET_INPUT_FIELD]
                             .encode(encoding="UTF-8", errors="strict")
                             .decode("UTF-8")
                         )
-                        label = json_line[REDDIT_DATASET_LABEL_FIELD]
-                        id = json_line[REDDIT_DATASET_ID_FIELD]
+                        label = json_line[DATASET_LABEL_FIELD]
+                        id = json_line[DATASET_ID_FIELD]
 
-                        # if provided, filter data *not* in the subreddit_labels_list
+                        # if provided, restrict data universe to labels in subreddit_labels_list
                         if (
                             subreddit_labels_list is not None
                             and label not in subreddit_labels_list
@@ -122,22 +122,17 @@ def read_files(
     min_valid_tokens: int = 3,
     subreddit_labels_list: Optional[List] = None,
 ) -> Dict[str, List]:
-    """
-    Read a a list of zst files.
+    """Read a a list of zst files.
 
     Args:
-        data_files (List of strings): list of zst data files to read
-        data_type (string): reddit or twitter
-        n_read (int or None): Number of *valid* lines to read (filtered lines don't count). Set to None to read everything
-        min_valid_tokens (int): Titles with fewer than this are automatically filtered out
-        subreddit_labels_list: When specified, it is a dictionary of subreddits and associated coherent/noise label
+        data_files: List of data file paths
+        n_read: Number of valid lines to read (filtered lines don't count). Set to None to read everything
+        min_valid_tokens: minimum number of tokens required to add to the dataset.
+        subreddit_labels_list: When specified, restrict the data universe to these labels
 
     Returns:
-        data (dict): the read data
+        data: the read-in data
     """
-    if n_read is None:
-        logger.info("n_read = None, reading all documents from all data files")
-
     data: Dict[str, Any] = {}
     n_read_remaining = n_read  # remaining lines left to read
     for data_file in data_files:
