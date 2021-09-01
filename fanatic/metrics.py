@@ -155,22 +155,21 @@ def calculate_cluster_stats(
     # number of documents that actually ended up in a cluster
     number_of_documents_in_clusters = number_of_tp + number_of_fp
 
-    # "precision", "recall", and "f1" (these aren't the true metrics, e.g. for TP this doesnt account for whether a TP
-    # ended up in the correct cluster, only measures that it did ended up in a cluster and was supposed to)
+    # calculate pseudo precision / recall
     if (
         (number_of_tp + number_of_fp) > 0
         and (number_of_tp + number_of_tn) > 0
         and number_of_tp > 0
     ):
-        coarse_precision = number_of_tp / (number_of_tp + number_of_fp)
-        coarse_recall = number_of_tp / (number_of_tp + number_of_fn)
-        coarse_f1 = (
-            2 * coarse_precision * coarse_recall / (coarse_precision + coarse_recall)
+        pseudo_precision = number_of_tp / (number_of_tp + number_of_fp)
+        pseudo_recall = number_of_tp / (number_of_tp + number_of_fn)
+        pseudo_f1 = (
+            2 * pseudo_precision * pseudo_recall / (pseudo_precision + pseudo_recall)
         )
     else:
-        coarse_precision = 0
-        coarse_recall = 0
-        coarse_f1 = 0
+        pseudo_precision = 0
+        pseudo_recall = 0
+        pseudo_f1 = 0
 
     documents_stats = {
         "n_total_documents": n_documents,
@@ -186,9 +185,9 @@ def calculate_cluster_stats(
         "tn_fraction": number_of_tn / n_documents,
         "n_fn": number_of_fn,
         "fn_fraction": number_of_fn / n_documents,
-        "coarse_precision": coarse_precision,
-        "coarse_recall": coarse_recall,
-        "coarse_f1": coarse_f1,
+        "pseudo_precision": pseudo_precision,
+        "pseudo_recall": pseudo_recall,
+        "pseudo_f1": pseudo_f1,
     }
     for key, value in documents_stats.items():
         logger.info(f"{key}: {value}")
@@ -221,8 +220,8 @@ def average_metrics_stats_from_seed_runs(aggregate_metrics: List[Dict[str, float
                 logger.warning(f"Couldnt find {key} in {run}")
 
         averaged_metrics[key] = {"mean": np.mean(key_values), "std": np.std(key_values)}
-    print(f"****** AVERAGED Metrics ******")
-    print(averaged_metrics)
+    logger.info(f"****** AVERAGED Metrics ******")
+    logger.info(averaged_metrics)
 
     # average stats
     averaged_stats = {}
@@ -236,8 +235,6 @@ def average_metrics_stats_from_seed_runs(aggregate_metrics: List[Dict[str, float
                 logger.warning(f"Couldnt find {key} in {run}")
 
         averaged_stats[key] = {"mean": np.mean(key_values), "std": np.std(key_values)}
-
-    # print
-    print("****** AVERAGED Cluster Stats ******")
-    print(averaged_stats)
+    logger.info("****** AVERAGED Cluster Stats ******")
+    logger.info(averaged_stats)
     return averaged_metrics, averaged_stats
