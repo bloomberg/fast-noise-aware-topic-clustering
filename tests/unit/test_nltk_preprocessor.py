@@ -1,4 +1,5 @@
 from fanatic.preprocess.nltk_preprocessor import NLTKPreprocessor
+import pytest
 
 EMBEDDING_MODEL_FILE = "tests/unit/small_w2v_file.txt"
 DATA_INPUT = [
@@ -11,7 +12,7 @@ FEATURIZED_EXPECTED_CLUSTERING_TOKENS = [{'clustering_tokens': ['looking', 'tatt
 def test_nltk_preprocessor():
     # GIVEN
     data = DATA_INPUT
-    engine = NLTKPreprocessor(embedding_model_file=EMBEDDING_MODEL_FILE)
+    engine = NLTKPreprocessor()
 
     # WHEN
     preprocessed_data_generator = engine.preprocess(data)
@@ -35,3 +36,13 @@ def test_nltk_featurizer():
     for i, datum in enumerate(featurized_data):
         assert datum["clustering_tokens"] == FEATURIZED_EXPECTED_CLUSTERING_TOKENS[i]["clustering_tokens"]
         assert "embedding" in datum.keys()
+
+
+def test_nltk_fail_featurize():
+    # GIVEN
+    data = DATA_INPUT
+    engine = NLTKPreprocessor()
+
+    # WHEN / THEN
+    with pytest.raises(ValueError):
+        engine.featurize(data)

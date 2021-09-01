@@ -1,16 +1,14 @@
-from fanatic.clustering.clusteringcomponents import (
-    ClusteringModel,
-    Cluster,
-)
-import numpy as np
-import scipy.spatial
+import logging
 import random
 import time
 import uuid
 from itertools import combinations
 from typing import Dict, List, Optional, Tuple
 
-import logging
+import numpy as np
+import scipy.spatial
+
+from fanatic.clustering.clusteringcomponents import Cluster, ClusteringModel
 
 logging_format = (
     "%(asctime)s %(filename)s %(funcName)s %(lineno)d %(levelname)s %(message)s"
@@ -239,8 +237,8 @@ class FanaticClusterModel(ClusteringModel):
         clustering_threshold: float,
         min_term_probability: float,
         distance_metric: str,
-        batch_size: Optional[int] = None,
-        flag_update_documents: Optional[bool] = False,
+        flag_update_documents: bool,
+        batch_size: int = 150000,
     ) -> None:
         """
         Assigns (the remaining) documents to fixed clusters (i.e. no new clusters can be made), done significantly
@@ -408,13 +406,13 @@ class FanaticClusterModel(ClusteringModel):
                         # re-assign remaining documents in a vectorized way (faster), then leave loop
                         remaining_document_keys = document_keys[doc_i:]
                         self.assign_documents_to_fixed_clusters(
-                            remaining_document_keys,
-                            cluster_vectors,
-                            self.clustering_threshold,
-                            self.min_term_probability,
-                            self.distance_metric,
-                            batch_size=self.batch_size,
+                            document_keys=remaining_document_keys,
+                            cluster_vectors=cluster_vectors,
+                            clustering_threshold=self.clustering_threshold,
+                            min_term_probability=self.min_term_probability,
+                            distance_metric=self.distance_metric,
                             flag_update_documents=False,
+                            batch_size=self.batch_size,
                         )
                         break
 
@@ -452,13 +450,13 @@ class FanaticClusterModel(ClusteringModel):
             cluster.documents.clear()
 
         self.assign_documents_to_fixed_clusters(
-            document_keys,
-            cluster_vectors,
-            self.clustering_threshold,
-            self.min_term_probability,
-            self.distance_metric,
-            batch_size=self.batch_size,
+            document_keys=document_keys,
+            cluster_vectors=cluster_vectors,
+            clustering_threshold=self.clustering_threshold,
+            min_term_probability=self.min_term_probability,
+            distance_metric=self.distance_metric,
             flag_update_documents=True,
+            batch_size=self.batch_size,
         )
 
         # filter out clusters that are too small

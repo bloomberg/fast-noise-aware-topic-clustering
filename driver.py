@@ -1,13 +1,14 @@
 import argparse
+from fanatic.arguments import parse_args, build_algorithm_config, CONVERGENCE_PATIENCE, CONVERGENCE_IMPROVEMENT_THRESHOLD
 import fanatic.metrics
 import fanatic.output
 from fanatic.preprocess import filter_data, labels, nltk_preprocessor, read_data
 from fanatic.clustering import clusteringcomponents as cc
-from fanatic.clustering.config import ALGORITHM_CONFIG, CONVERGENCE_PATIENCE, CONVERGENCE_IMPROVEMENT_THRESHOLD
 import json
 import numpy as np
 import os
 import uuid
+from typing import Any, Dict, List, Tuple
 
 import logging
 logging_format = '%(asctime)s %(filename)s %(funcName)s %(lineno)d %(levelname)s %(message)s'
@@ -17,11 +18,11 @@ logger = logging.getLogger(__name__)
 LARGE_INT = 100000   # arbitrary large int for picking random seeds
 
 
-def process_and_write_aggregate_results(aggregate_metrics, aggregate_stats, configuration, args, dataset_id):
+def process_and_write_aggregate_results(aggregate_metrics: List[Dict], aggregate_stats: List[Dict], configuration: Dict, args: argparse.Namespace, dataset_id: str) -> None:
     '''
     After all individual clustering runs are complete, this aggregates the stats/metrics from those runs and writes 
     them to a configparser-style file for easy loading later
-    
+
     Args:
         aggregate_metrics (list of dicts): list of metrics dictionaries, one per seed-job
         aggregate_stats (list of dicts): list of stats dictionaries, one per seed-job
@@ -35,10 +36,10 @@ def process_and_write_aggregate_results(aggregate_metrics, aggregate_stats, conf
     fanatic.output.save_averaged_results(averaged_metrics, averaged_stats, configuration, args, dataset_id)
     
     final_metric = averaged_metrics['ami']['mean']
-    logger.info(f"final averaged ami metric={final_metric}")
+    logger.info(f"For dataset_id={dataset_id} final averaged ami metric={final_metric}")
 
 
-def run_clustering(args, cluster_handler, data_labels, configuration, seeds_for_job, dataset_id):
+def run_clustering(args: argparse.Namespace, cluster_handler, data_labels: Dict[str, str], configuration: Dict[str, Any], seeds_for_job: List[int], dataset_id: str) -> Tuple[List[Dict], List[Dict]]:
     '''
     Runs an individual clustering job, calculates metrics, saves results. 
     Args:
@@ -84,7 +85,7 @@ def run_clustering(args, cluster_handler, data_labels, configuration, seeds_for_
     return aggregate_metrics, aggregate_stats
 
 
-def get_data_and_labels(args):
+def get_data_and_labels(args: argparse.Namespace) -> Tuple[List[Dict], Dict]:
     '''
     This is the general high-level function surrounding all things related to data and labels. Specifically it includes:
         - loading annotation labels to be used to validate the clustering results (if annotation_labels_file is provided)
@@ -108,13 +109,14 @@ def get_data_and_labels(args):
 
         # read all the data from provided data files, and then filter down later according to subreddit_noise_percentage
         n_read_from_data_files = None
+        logger.info(f"Reading in all data from all provided input files. Will filter later according to subreddit_noise_percentage={subreddit_noise_percentage}")
 
 
     # load data
     logger.info(f'Loading inquiries')
     data = read_data.read_files(args.data_files, 
                                 n_read=n_read_from_data_files,
-                                min_sentence_length=args.min_sentence_length,
+                                min_valid_tokens=args.min_valid_tokens,
                                 subreddit_labels_list=subreddit_labels_list)
 
     # if there is a desired valid/noise subreddit percentage specified, filter here
@@ -132,92 +134,24 @@ def get_data_and_labels(args):
     return data, data_labels
 
 
-# input data type for argparse
-def restricted_float(x):
-    try:
-        x = float(x)
-    except ValueError:
-        raise argparse.ArgumentTypeError("%r not a floating-point literal" % (x,))
-
-    if x < 0.0 or x > 1.0:
-        raise argparse.ArgumentTypeError("%r not in range [0.0, 1.0]"%(x,))
-    return x
-
-
-def parse_args():
-    parser = argparse.ArgumentParser(description='Cluster reddit titles')                   
-
-    # data / label arguments
-    parser.add_argument('--data-files', type=str,
-                        nargs='+',
-                        default=[ 
-                            "data/RS_2011-01.zst"
-                        ],
-                        help='data files to load')
-    parser.add_argument('--n-read', type=int,
-                        default=10000,  # TODO: change to None as default
-                        help='Number of documents to read in. Default is set to `None`, which reads everything')
-    parser.add_argument('--subreddit-noise-percentage', type=restricted_float,
-                        default=0.2,
-                        help='controls the percentage of "no"/("yes" + "no") annotated subreddits. '
-                             'Requires --subreddit-labels-file argument to be specified'
-                             'Leave defaul="None" to disregard this feature (and not use any specific noise ratio)')
-    parser.add_argument('--seed-data-subsample', type=int,
-                        default=42,
-                        help='this seed is used when subsampling `n_read` from valid/noise docs')
-    parser.add_argument('--subreddit-labels-file', type=str,
-                        default=f'subreddit_labels.json',
-                        help='location of file containing annotation labels')
-
-    # preprocessing arguments
-    parser.add_argument('--embedding-model-file', type=str,
-                        default='w2v_reddit_s300_w5_sg1.txt', 
-                        help='embedding model file')
-    parser.add_argument('--min-sentence-length', type=int,
-                        default=3,
-                        help='Minimum number of words in a sentence for the sentence to be used in clustering; \
-                        the first sentence in an inquiry with at least min_sentence_length words will be used.')
-    
-    # algorithm arguments
-    parser.add_argument('--cluster-algorithm',
-                        type=str,
-                        default='fanatic',
-                        help='algorithm to run clustering against')
-    parser.add_argument('--n-seed-jobs', type=int,
-                        default=1,
-                        help='Number of (different-seeded) clustering jobs to run')
-    parser.add_argument('--clustering-seed', type=int,
-                        default=42,
-                        help='Used for generating individual clustering run seeds')   
-
-    # output arguments
-    parser.add_argument('--output-dir',
-                        type=str,
-                        default='output',
-                        help='directory for where to dump results')
-    parser.add_argument('--flag-save-clusteringmodel', action='store_true',
-                        default=False,
-                        help='If true, save pickled ClusteringModel results to hdfs (warning: It is a large file)')
-
-    args = parser.parse_args()
-    return args
-
-
 def main():
     # parse input arguments
     args = parse_args()
 
     # load configuration and init cluster handler
-    configuration = ALGORITHM_CONFIG[args.cluster_algorithm]
+    configuration = build_algorithm_config(args)
     cluster_handler = cc.ClusterHandler(configuration)
-    logger.info(f"Init cluster handler with configuration Values: {configuration}")
+    logger.info(f"Init cluster handler with algorithm configuration: {configuration}")
 
     # get data and labels
     data, data_labels = get_data_and_labels(args)
     logger.info("gathered data")
 
     # preprocess data
-    engine = nltk_preprocessor.NLTKPreprocessor(args.embedding_model_file)
+    engine = nltk_preprocessor.NLTKPreprocessor(
+        embedding_model_file=args.embedding_model_file,
+        min_valid_tokens=args.min_valid_tokens,
+    )
     featurized_data_generator = engine.featurize(data)
     cluster_handler.prepare_for_clustering(featurized_data_generator, 
                                            CONVERGENCE_PATIENCE, 

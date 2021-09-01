@@ -1,11 +1,14 @@
-from sklearn.metrics import adjusted_mutual_info_score
-from collections import Counter
-import numpy as np
-import uuid
-import random
-from fanatic.preprocess.labels import NOISE_LABEL
-
 import logging
+import random
+import uuid
+from collections import Counter
+from typing import Any, Dict, List, FrozenSet
+
+import numpy as np
+from sklearn.metrics import adjusted_mutual_info_score
+
+from fanatic.preprocess.labels import NOISE_LABEL
+from fanatic.clustering.clusteringcomponents import Document
 
 logging_format = (
     "%(asctime)s %(filename)s %(funcName)s %(lineno)d %(levelname)s %(message)s"
@@ -19,13 +22,13 @@ NO_ASSIGNMENT = (
 )
 
 
-def calculate_metrics(doc_assignments, data_labels, cluster_stats):
+def calculate_metrics(clustered_documents: Dict[FrozenSet, Document], data_labels: Dict[str, str], cluster_stats: Dict[str, Any]) -> Dict[str, float]:
     """
     Convert clustering results (and labels) into two simple flat lists of clustering assignment / label, so they
     can be easily consumed by sklearn.metrics. Additionally this function calculates a number of stats to print and
     save to file.
     Args:
-        doc_assignments (dict): This is the cluster_handler.clustering_model.documents object from clusteringalgos.py
+        clustered_documents (dict): This is the cluster_handler.clustering_model.documents object from clusteringalgos.py
         data_labels (dict): These are the subreddit labels. They are `derived` since (if the proper flags are set)
                                their label is determined from the annotations (either the subreddit name or
                                NOISE_LABEL). See `label_generation.get_derived_clustering_label()` for more info
@@ -51,7 +54,7 @@ def calculate_metrics(doc_assignments, data_labels, cluster_stats):
     cluster_ids = []
 
     # main
-    for doc_key, document in doc_assignments.items():
+    for document in clustered_documents.values():
         # get cluster assignment
         cluster_id = document.cluster_id
         assignment = cluster_id if cluster_id is not None else NO_ASSIGNMENT
@@ -98,8 +101,8 @@ def calculate_metrics(doc_assignments, data_labels, cluster_stats):
 
 
 def report_stats(
-    cluster_stats, cluster_ids, number_of_tp, number_of_fp, number_of_tn, number_of_fn
-):
+    cluster_stats: Dict[str, Any], cluster_ids: List[str], number_of_tp: int, number_of_fp: int, number_of_tn: int, number_of_fn: int
+) -> None:
     """
     This prints the stats in the log file (for quickly scanning) and also adds fields to `cluster_stats`
     which is eventually written to a metrics file for downstream analysis
@@ -192,7 +195,7 @@ def report_stats(
     cluster_stats.update(documents_stats)
 
 
-def average_metrics_stats_from_seed_runs(aggregate_metrics, aggregate_stats):
+def average_metrics_stats_from_seed_runs(aggregate_metrics: List[Dict[str, float]], aggregate_stats: List[Dict[str, Any]]):
     """
     Obtain the mean and standard deviation metric values from a number of seed runs
 

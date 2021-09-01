@@ -1,9 +1,9 @@
 import json
-import sys
-from typing import Dict, List, Optional
-import zstandard as zstd
-
 import logging
+import sys
+from typing import Any, Dict, List, Optional
+
+import zstandard as zstd
 
 logging_format = (
     "%(asctime)s %(filename)s %(funcName)s %(lineno)d %(levelname)s %(message)s"
@@ -21,16 +21,16 @@ def read_file(
     data_file: str,
     data: Dict,
     n_read: Optional[int] = None,
-    min_sentence_length: int = 3,
+    min_valid_tokens: int = 3,
     subreddit_labels_list: Optional[List] = None,
-):
+) -> int:
     """
     Read a (reddit) zst data file
     Args:
         data_file (string): file path
         data (dict): where the read data is stored
         n_read (int or None): Number of *valid* lines to read (filtered lines don't count). Set to None to read everything
-        min_sentence_length (int): Titles with fewer than this are automatically filtered out
+        min_valid_tokens (int): Titles with fewer than this are automatically filtered out
         subreddit_labels_list (list or None): When specified, it is a list of subreddits, and only titles from these
                                           subreddits are considered (everything else is filtered)
     Returns:
@@ -81,7 +81,7 @@ def read_file(
                             continue
 
                         # filter out very short titles
-                        if len(title.split()) < min_sentence_length:
+                        if len(title.split()) < min_valid_tokens:
                             continue
 
                         # filter out duplicate ids
@@ -119,9 +119,9 @@ def read_file(
 def read_files(
     data_files: List[str],
     n_read: Optional[int] = None,
-    min_sentence_length: int = 3,
+    min_valid_tokens: int = 3,
     subreddit_labels_list: Optional[List] = None,
-):
+) -> Dict[str, List]:
     """
     Read a a list of zst files.
 
@@ -129,7 +129,7 @@ def read_files(
         data_files (List of strings): list of zst data files to read
         data_type (string): reddit or twitter
         n_read (int or None): Number of *valid* lines to read (filtered lines don't count). Set to None to read everything
-        min_sentence_length (int): Titles with fewer than this are automatically filtered out
+        min_valid_tokens (int): Titles with fewer than this are automatically filtered out
         subreddit_labels_list: When specified, it is a dictionary of subreddits and associated coherent/noise label
 
     Returns:
@@ -138,14 +138,14 @@ def read_files(
     if n_read is None:
         logger.info("n_read = None, reading all documents from all data files")
 
-    data = {}
+    data: Dict[str, Any] = {}
     n_read_remaining = n_read  # remaining lines left to read
     for data_file in data_files:
         valid_titles_read = read_file(
             data_file,
             data,
             n_read=n_read_remaining,
-            min_sentence_length=min_sentence_length,
+            min_valid_tokens=min_valid_tokens,
             subreddit_labels_list=subreddit_labels_list,
         )
         logger.info(f"Completed reading data file: {data_file}")

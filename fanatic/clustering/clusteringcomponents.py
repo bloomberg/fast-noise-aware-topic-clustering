@@ -1,8 +1,9 @@
-import numpy as np
 import collections
-import time
-
 import logging
+import time
+from typing import Any, Dict, FrozenSet, List, Optional
+
+import numpy as np
 
 logging_format = (
     "%(asctime)s %(filename)s %(funcName)s %(lineno)d %(levelname)s %(message)s"
@@ -12,12 +13,27 @@ logger = logging.getLogger(__name__)
 
 
 class ClusterHandler:
-    def __init__(self, configuration):
+    def __init__(self, configuration: Dict) -> None:
         cluster_algorithm = configuration["algorithm"]
         self.clustering_model = cluster_algorithm()
         self.clustering_model.consume_config(configuration)
 
-    def add_documents(self, featurized_data):
+    def prepare_for_clustering(
+        self, featurized_data, convergence_patience, convergence_improvement_threshold
+    ):
+
+        logger.info("Converting data into Documents")
+        self._add_documents(featurized_data)
+
+        logger.info("Setting document weights")
+        self.clustering_model.set_document_weights()
+
+        logger.info("Setting Convergence (Clustering) limits")
+        self.clustering_model.set_convergence_limits(
+            convergence_patience, convergence_improvement_threshold
+        )
+
+    def _add_documents(self, featurized_data: List[Dict]) -> None:
         """Create the documents to be clustered from the featurized data
 
         Args:
@@ -29,37 +45,19 @@ class ClusterHandler:
                 logger.info(f"Adding document {i}...")
             self.clustering_model.add_document(datum)
 
-    def prepare_for_clustering(
-        self, featurized_data, convergence_patience, convergence_improvement_threshold
-    ):
-        # logger.info('Initializing model')
-        # self.clustering_model.set_embedding_model(embedding_model)
-        # self.clustering_model.set_filter_words(stop_words)
-
-        logger.info("Converting data into Documents")
-        self.add_documents(featurized_data)
-
-        logger.info("Setting document weights")
-        self.clustering_model.set_document_weights()
-
-        logger.info("Setting Convergence (Clustering) limits")
-        self.clustering_model.set_convergence_limits(
-            convergence_patience, convergence_improvement_threshold
-        )
-
-    def cluster(self, seed):
+    def cluster(self, seed: int) -> Dict:
         logger.info("Clustering")
         stats = self.clustering_model.cluster(seed)
         logger.info("Clustered")
         return stats
 
-    def clear_results(self):
+    def clear_results(self) -> None:
         """
         Reset clusters and document assignments. Important to do after each individual
         clustering run if you are re-using cluster handler for another clustering run
         """
         # re-initialize convergence
-        self.clustering_model._previous_best_metric_value = None
+        self.clustering_model._previous_best_metric_value: Optional[float] = None
         self.clustering_model._patience_counter = 0
 
         # clear stats
@@ -67,7 +65,7 @@ class ClusterHandler:
 
         # clear results
         self.clustering_model.clusters = []
-        for key, document in self.clustering_model.documents.items():
+        for document in self.clustering_model.documents.values():
             document.clear_cluster_assignment()
 
 
@@ -83,17 +81,17 @@ class Document:
         dist_to_cluster_center (float): distance fom the document to its cluster in embedding space
     """
 
-    def __init__(self, tokens, vector):
+    def __init__(self, tokens: FrozenSet, vector: np.ndarray) -> None:
         self.tokens = tokens
         self.vector = vector
-        self.document_ids = []
-        self.raw_texts = []
+        self.document_ids: List[str] = []
+        self.raw_texts: List[str] = []
         self.weight = 0
         self.cluster = None
         self.cluster_id = None
         self.dist_to_cluster_center = -1
 
-    def clear_cluster_assignment(self):
+    def clear_cluster_assignment(self) -> None:
         self.cluster = None
         self.cluster_id = None
         self.dist_to_cluster_center = -1
@@ -107,7 +105,7 @@ class Cluster:
         documents (:obj:`list` of :obj:`Document`): Document objects which belong to this cluster
     """
 
-    def __init__(self, cluster_id, documents):
+    def __init__(self, cluster_id: str, documents: List[Document]):
         self.cluster_id = cluster_id
         self.center = None
         self.token_probability = None
@@ -137,7 +135,7 @@ class Cluster:
                 k: v / num_documents for k, v in token_ctr.items()
             }
 
-    def get_document_ids(self):
+    def get_document_ids(self) -> List[str]:
         """Return document ids of all documents in cluster
         Returns:
             :obj:`list` of str: A list of document ids which are contained in this cluster
@@ -150,7 +148,7 @@ class Cluster:
         ]
         return document_ids
 
-    def size(self):
+    def size(self) -> int:
         """
         Get the number of documents in the cluster
         Returns:
@@ -167,12 +165,12 @@ class ClusteringModel:
         clusters (:obj:`list` of :obj:`Cluster`): clusters in this model
     """
 
-    def __init__(self):
-        self.documents = {}
-        self.clusters = []
-        self.stats = {}
+    def __init__(self) -> None:
+        self.documents: Dict[FrozenSet, Document] = {}
+        self.clusters: List[Cluster] = []
+        self.stats: Dict[str, Any] = {}
 
-    def add_document(self, datum):
+    def add_document(self, datum: Dict) -> None:
         # frozenset so that tokens can become the key
         document_tokens = frozenset(datum["clustering_tokens"])
 
@@ -185,21 +183,21 @@ class ClusteringModel:
         document.document_ids.append(datum["id"])
         document.raw_texts.append(datum["text"])
 
-    def set_document_weights(self):
+    def set_document_weights(self) -> None:
         """Set the weight for each document which is the number of ids."""
         for document in self.documents.values():
             document.weight = len(document.document_ids)
 
     def set_convergence_limits(
-        self, convergence_patience, convergence_improvement_threshold
-    ):
+        self, convergence_patience: int, convergence_improvement_threshold: float
+    ) -> None:
         self._patience = convergence_patience
         self._convergence_improvement_threshold = convergence_improvement_threshold
         # initialize
         self._previous_best_metric_value = None
         self._patience_counter = 0
 
-    def check_convergence(self, metric):
+    def check_convergence(self, metric: float) -> bool:
         """
         Checks for convergence. Assumes that the metric is trying to be minimzed, and that
         all metric values are positive. This is an equivalent principle to "early stopping",

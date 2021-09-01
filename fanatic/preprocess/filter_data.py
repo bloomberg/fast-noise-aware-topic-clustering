@@ -1,7 +1,8 @@
-import random
 import logging
+import random
+from typing import Any, Dict, List
+
 from fanatic.preprocess.labels import NOISE_LABEL
-from typing import Dict, List
 
 logger = logging.getLogger(__name__)
 
@@ -77,8 +78,8 @@ def filter_data_by_noise_percentage(
     noise_indices = noise_indices[:n_required_noise_titles]
 
     # get filtered data
-    filtered_data = {}
-    counts_by_label = {}
+    filtered_data: Dict[str, Any] = {}
+    counts_by_label: Dict[str, int] = {}
     _add_data_to_filtered_set(
         filtered_data, counts_by_label, valid_data, valid_subreddit_names, valid_indices
     )

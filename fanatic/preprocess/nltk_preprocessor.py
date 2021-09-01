@@ -1,23 +1,34 @@
-from fanatic.preprocess.generic_preprocessor import GenericPreprocessor
-from nltk.tokenize import RegexpTokenizer
-from nltk.corpus import stopwords
-import numpy as np
-from typing import Any, Dict, Generator, List
+import logging
 import re
+from typing import Any, Dict, Generator, List, Optional
+
+import numpy as np
 from gensim.models import KeyedVectors
+from nltk.corpus import stopwords
+from nltk.tokenize import RegexpTokenizer
+
+from fanatic.preprocess.generic_preprocessor import GenericPreprocessor
+
+logging_format = '%(asctime)s %(filename)s %(funcName)s %(lineno)d %(levelname)s %(message)s'
+logging.basicConfig(level=logging.INFO, format=logging_format)
+logger = logging.getLogger(__name__)
 
 NUM_RE = re.compile(r"\d+[A-Za-z]{,2}")
 
 
 class NLTKPreprocessor(GenericPreprocessor):
-    def __init__(self, embedding_model_file, min_required_valid_tokens=3):
+    def __init__(self, embedding_model_file: Optional[str]=None, min_valid_tokens: int=3):
         # https://www.nltk.org/api/nltk.tokenize.html
         self.tokenizer = RegexpTokenizer(r"\w+")
         self.stopwords = stopwords.words("english")
-        self.embedding_model = KeyedVectors.load_word2vec_format(
-            embedding_model_file, binary=False
-        )
-        self.min_required_valid_tokens = min_required_valid_tokens
+        self.min_valid_tokens = min_valid_tokens
+        if embedding_model_file is not None:
+            self.embedding_model = KeyedVectors.load_word2vec_format(
+                embedding_model_file, binary=False
+            )
+        else:
+            self.embedding_model = None
+            logger.warning("embedding_model_file not provided to nltk preprocessor. Only `.preprocess` function will successfully work.")
         super().__init__()
 
     def preprocess(
@@ -33,7 +44,7 @@ class NLTKPreprocessor(GenericPreprocessor):
             ]
             yield d
 
-    def _get_averaged_embedding(self, clustering_tokens):
+    def _get_averaged_embedding(self, clustering_tokens: List[str]) -> np.ndarray:
         vecs = [self.embedding_model[token] for token in clustering_tokens]
         averaged_vector = np.average(vecs, axis=0)
         return averaged_vector
@@ -41,11 +52,14 @@ class NLTKPreprocessor(GenericPreprocessor):
     def embed(
         self, preprocessed_data_generator: Generator[Dict[str, Any], None, None]
     ) -> Generator[Dict[str, Any], None, None]:
+        if self.embedding_model is None:
+            raise ValueError("No embedding model file was provided during init, cannot featurize data using nltk preprocessor.")
+
         for d in preprocessed_data_generator:
             embedding_tokens = [
                 tok for tok in d["norm_tokens"] if tok in self.embedding_model
             ]
-            if len(embedding_tokens) >= self.min_required_valid_tokens:
+            if len(embedding_tokens) >= self.min_valid_tokens:
                 d["clustering_tokens"] = embedding_tokens
                 d["embedding"] = self._get_averaged_embedding(embedding_tokens)
                 yield d
@@ -56,6 +70,9 @@ class NLTKPreprocessor(GenericPreprocessor):
         """Combination of preprocess and embed. The required fields for downstream clustering are:
         `id`, `text`, `clustering_tokens`, `embedding`
         """
+        if self.embedding_model is None:
+            raise ValueError("No embedding model file was provided during init, cannot featurize data using nltk preprocessor.")
+
         preprocessed_data_generator = self.preprocess(data)
         embedding_data_generator = self.embed(preprocessed_data_generator)
         return embedding_data_generator

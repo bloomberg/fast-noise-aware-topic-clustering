@@ -1,9 +1,9 @@
 import configparser
-import pickle
-import uuid
+import json
 import logging
 import os
-import json
+import pickle
+import uuid
 
 logging_format = (
     "%(asctime)s %(filename)s %(funcName)s %(lineno)d %(levelname)s %(message)s"
@@ -89,8 +89,8 @@ def write_labels_and_assignments(
     logger.info("wrote assignments and labels to file")
 
 
-def _get_output_basename(output_dir, cluster_algorithm, clustering_run_id):
-    return os.path.join(output_dir, f"{cluster_algorithm}_{clustering_run_id}")
+def _get_output_basename(output_dir, clustering_run_id):
+    return os.path.join(output_dir, f"fanatic_{clustering_run_id}")
 
 
 def save_results(
@@ -110,7 +110,7 @@ def save_results(
     Also uploads to hdfs if this is running on dsp
     """
     # create base path
-    basename = _get_output_basename(args.output_dir, args.cluster_algorithm, dataset_id)
+    basename = _get_output_basename(args.output_dir, dataset_id)
     basename += f"_{run_index}"
 
     # write labels and assignments to file
@@ -145,7 +145,7 @@ def save_averaged_results(
     consistency as save_results()
     """
     results_file = _get_output_basename(
-        args.output_dir, args.cluster_algorithm, dataset_id
+        args.output_dir, dataset_id
     )
     results_file += f"_results_averaged.txt"
 
