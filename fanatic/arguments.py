@@ -83,6 +83,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument('--max-num-clusters', type=int,
                         default=600,
                         help='Maximum number of clusters allowed to be created')
+    parser.add_argument('--min-cluster-size',
+                        type=int,
+                        default=50,
+                        help='Minimum cluster size')
     parser.add_argument('--distance-metric', choices=['euclidean', 'cosine'],
                         default='cosine',
                         help='Distance metric used to calculate vector distances')
@@ -95,10 +99,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument('--max-clustering-time', type=int,
                         default=7200,
                         help='Maximum amount of time (in seconds) to spend clustering')
-    parser.add_argument('--min-cluster-size',
-                        type=int,
-                        default=50,
-                        help='Minimum cluster size')
     parser.add_argument('--batch-size', type=int,
                         default=150000)
     parser.add_argument('--n-seed-jobs', type=int,

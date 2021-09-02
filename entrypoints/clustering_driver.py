@@ -4,6 +4,7 @@ import fanatic.metrics
 import fanatic.output
 from fanatic.preprocess import filter_data, labels, nltk_preprocessor, read_data
 from fanatic.clustering import clusteringcomponents as cc
+from fanatic.clustering.clusteringcomponents import ClusterHandler
 import json
 import numpy as np
 import os
@@ -19,17 +20,17 @@ LARGE_INT = 100000   # arbitrary large int for picking random seeds
 
 
 def process_and_write_aggregate_results(aggregate_metrics: List[Dict], aggregate_stats: List[Dict], configuration: Dict, args: argparse.Namespace, dataset_id: str) -> None:
-    '''
-    After all individual clustering runs are complete, this aggregates the stats/metrics from those runs and writes 
-    them to a configparser-style file for easy loading later
+    '''Average the stats and metrics from the individual seed-jobs.
 
     Args:
-        aggregate_metrics (list of dicts): list of metrics dictionaries, one per seed-job
-        aggregate_stats (list of dicts): list of stats dictionaries, one per seed-job
-        configuration (dict): the hyperparameters for the job
-        args (argparse object): contains the input arguments for the job
-        dataset_id (str): name shared across all seed-jobs
-
+        aggregate_metrics: list of metrics dictionaries, one per seed-job
+        aggregate_stats: list of stats dictionaries, one per seed-job
+        configuration: the hyperparameters for the job
+        args: contains the input arguments for the job
+        dataset_id: unique identifier shared by all seed-jobs
+    
+    Returns:
+        (nothing)
     '''
     averaged_metrics, averaged_stats = fanatic.metrics.average_metrics_stats_from_seed_runs(aggregate_metrics, aggregate_stats)
 
@@ -39,22 +40,20 @@ def process_and_write_aggregate_results(aggregate_metrics: List[Dict], aggregate
     logger.info(f"For dataset_id={dataset_id} final averaged ami metric={final_metric}")
 
 
-def run_clustering(args: argparse.Namespace, cluster_handler, data_labels: Dict[str, str], configuration: Dict[str, Any], seeds_for_job: List[int], dataset_id: str) -> Tuple[List[Dict], List[Dict]]:
-    '''
-    Runs an individual clustering job, calculates metrics, saves results. 
+def run_clustering(args: argparse.Namespace, cluster_handler: ClusterHandler, data_labels: Dict[str, str], configuration: Dict[str, Any], seeds_for_job: List[int], dataset_id: str) -> Tuple[List[Dict], List[Dict]]:
+    '''Performs the clustering on the featurized data. 
+
     Args:
-        args (argparse object): contains the input arguments for the job
-        cluster_handler (clusteringmodel object): contains the inputs/results of clustering
-        data_labels (dict): These are the subreddit labels. They are `derived` since (if the proper flags are set)
-                               their label is determined from the annotations (either the subreddit name or
-                               NOISE_LABEL). See `label_generation.get_derived_clustering_label()` for more info
-        configuration (dict): contains the hyperparameters for the job
-        run_index (int): integer of what job number this is
-        dataset_id (str or None): name shared across all seed-jobs. If None it is filled in output.save_results()
+        args: contains the input arguments for the job
+        cluster_handler: manages the clustering 
+        data_labels: Contain the labels associated with the clustering
+        configuration: contains the hyperparameters for the job
+        seeds_for_job: list of integers for the individual seed jobs to be run
+        dataset_id: unique identifier shared by all seed-jobs
+    
     Returns:
-        metrics (dict of dicts): contains all the metrics 
-        cluster_stats (dict): contains all the clustering stats (elapsed time, number of clusters, etc.)
-        dataset_id (str): the dataset id
+        aggregate_metrics: list of metrics across the seed-jobs
+        aggregate_stats: list of clustering stats across the seed-jobs
     '''
     # init
     aggregate_metrics = []
@@ -86,12 +85,14 @@ def run_clustering(args: argparse.Namespace, cluster_handler, data_labels: Dict[
 
 
 def get_data_and_labels(args: argparse.Namespace) -> Tuple[List[Dict], Dict]:
-    '''
-    This is the general high-level function surrounding all things related to data and labels. Specifically it includes:
-        - loading annotation labels to be used to validate the clustering results (if annotation_labels_file is provided)
-        - Reading in the data
-        - Achieving a specific ratio of "coherent" (subreddits annotated as 'yes') vs. "noise" (subreddits annotated as "no")
-          subreddits (given that `subreddit_noise_percentage` is not None and `n_read` is not None)
+    '''Loads the data and generates the labels associated with said data.
+
+    Args:
+        args: the argparser containing the arguments relevant to loading the data and labels
+
+    Returns:
+        data: The loaded data
+        data_labels: The mapping between datum id and label
     '''
 
     # load annotation labels

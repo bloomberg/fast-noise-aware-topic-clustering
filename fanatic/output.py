@@ -4,6 +4,9 @@ import logging
 import os
 import pickle
 import uuid
+from typing import Any, Dict, List
+from fanatic.clustering.clusteringcomponents import ClusteringModel
+import argparse
 
 logging_format = (
     "%(asctime)s %(filename)s %(funcName)s %(lineno)d %(levelname)s %(message)s"
@@ -12,15 +15,23 @@ logging.basicConfig(level=logging.INFO, format=logging_format)
 logger = logging.getLogger(__name__)
 
 
-def write_cluster_samples(
-    clustering_model, labels, write_path, max_write_per_cluster=10
-):
-    """
-    Simple function that writes a few inquiries from each cluster to give a birds-eye view of the clusters
+def _write_cluster_samples(
+    write_name: str, clustering_model: ClusteringModel, data_labels: Dict[str, str], max_write_per_cluster: int=10
+) -> None:
+    """Write a few inquiries from each cluster to file for qualitative assessment.
+
+    Args:
+        write_name: filename to write the metrics
+        clustering_model: The clustering model object that performed the clustering
+        data_labels: The mapping between datum id and label
+        max_write_per_cluster: the number of sample documents to write for each cluster
+
+    Returns:
+        (nothing)
     """
 
     logger.info("Writing cluster samples")
-    with open(write_path, "w") as output:
+    with open(write_name, "w") as output:
         for i, cluster in enumerate(clustering_model.clusters):
             # write
             output.write(f"*** Cluster {i} ***\n")
@@ -28,46 +39,48 @@ def write_cluster_samples(
                 tokens = " ".join(document.tokens)
                 document_labels = []
                 for document_id in document.document_ids:
-                    doc_label = labels[document_id]
+                    doc_label = data_labels[document_id]
                     document_labels.append(doc_label)
                 document_labels_str = ",".join(document_labels)
                 output.write(f"{tokens} -> {document_labels_str}\n")
             output.write("\n")
 
 
-def write_metrics(write_name, metrics, hypers, cluster_stats, args):
-    """
-    Write all the `cluster_stats`, `metrics` and hyperparameters to a file for downstream analysis.
+def _write_metrics(write_name: str, metrics: Dict[str, float], configuration: Dict[str, Any], cluster_stats: Dict[str, Any], args: argparse.Namespace) -> None:
+    """Write all cluster_stats, metrics and input arguments to file via configparser.
 
     Args:
-        write_name (string): filename to write the metrics
-        metrics (dict of dicts): nested dict of dicts that contains metrics calculated under different conditions
-                                (tn excluded, randomized, etc.). See calculate_metrics() in performance.py
-        hypers (dict): the hyperparameters
-        args (argparse object): the input arguments
-        cluster_stats (dict): the cluster_stats
-    """
-    logger.info("Writing metrics, hypers, stats")
+        write_name: filename to write the metrics
+        metrics: the calculated metrics (e.g. ami)
+        configuration: The hyperparameters associated with the clustering
+        args: The argparser containing the job's arguments
+        cluster_stats: The statistics gathered throughout the clustering job
 
+    Returns:
+        (nothing)
+    """
     config = configparser.ConfigParser()
-    config["HYPERS"] = hypers
+    config["HYPERS"] = configuration
     config["GENERAL_ARGS"] = {arg: str(getattr(args, arg)) for arg in vars(args)}
     config["CLUSTER_STATS"] = cluster_stats
     config["METRICS"] = metrics
     with open(write_name, "w") as configfile:
         config.write(configfile)
+    logger.info("Wrote metrics, configuration, stats")
 
 
-def write_labels_and_assignments(
-    labels_and_assignments_file, clustering_model, data_labels
+def _write_labels_and_assignments(
+    write_name: str, clustering_model: ClusteringModel, data_labels: Dict[str, str]
 ):
-    """
-    Write the cluster assignments and labels to json so that when can recalculate metrics whenever we
-    need without re-running.
+    """Dump cluster assignments and labels so one can recalculate metrics without re-running the (expensive) clustering job.
+
     Args:
-        labels_and_assignments_file (str): the name of the json file
-        clustering_model (cluster obj): clustering object that contains all the docs (and clusters)
-        data_labels (dict of str): (key, value) -> (document_id, label), where label = <subreddit> or "NOISE_LABEL"
+        write_name: the name of the output json file
+        clustering_model: The clustering model object that performed the clustering
+        data_labels: The mapping between datum id and label
+
+    Returns:
+        (nothing)
     """
     # key is document id, value is dict containing assignment and label
     labels_and_assignments_dict = {}
@@ -81,7 +94,7 @@ def write_labels_and_assignments(
             }
 
     # write to json
-    with open(labels_and_assignments_file, "w") as json_file:
+    with open(write_name, "w") as json_file:
         json.dump(labels_and_assignments_dict, json_file)
     logger.info("wrote assignments and labels to file")
 
@@ -91,40 +104,49 @@ def _get_output_basename(output_dir, clustering_run_id):
 
 
 def save_results(
-    args,
-    data_labels,
-    metrics,
-    configuration,
-    cluster_stats,
-    run_index,
-    dataset_id,
-    clustering_model,
-):
-    """
-    Main function that, per individual clustering run:
-        a) writes all the results to a file, and
-        b) writes a few titles from each cluster to a file.
-    Also uploads to hdfs if this is running on dsp
+    args: argparse.Namespace,
+    data_labels: Dict[str, str],
+    metrics: Dict[str, float],
+    configuration: Dict[str, Any],
+    cluster_stats: Dict[str, Any],
+    run_index: int,
+    dataset_id: str,
+    clustering_model: ClusteringModel,
+) -> None:
+    """Primary function that dumps the input arguments and results of each seed-job to files for downstream analysis.
+
+    Args:
+        args: The argparser containing the job's arguments
+        data_labels: The mapping between datum id and label
+        metrics: the calculated metrics (e.g. ami)
+        configuration: The hyperparameters associated with the clustering
+        cluster_stats: The statistics gathered throughout the clustering job
+        run_index: the seed-job number
+        dataset_id: unique identifier shared by all seed-jobs
+        clustering_model: The clustering model object that performed the clustering
+
+    Returns:
+        (nothing)
     """
     # create base path
     basename = _get_output_basename(args.output_dir, dataset_id)
     basename += f"_{run_index}"
 
-    # write labels and assignments to file
+    # write all document labels and assignments to file
     labels_and_assignments_file = f"{basename}_labels_and_assignments.json"
-    write_labels_and_assignments(
+    _write_labels_and_assignments(
         labels_and_assignments_file, clustering_model, data_labels
     )
 
-    # write cluster stats
+    # write the clustering summary to file - input arguments, clustering stats, clustering metrics
     results_file = f"{basename}_summary.txt"
-    write_metrics(results_file, metrics, configuration, cluster_stats, args)
+    _write_metrics(results_file, metrics, configuration, cluster_stats, args)
 
-    # write cluster samples
+    # write a few examples from each cluster to file for qualitative inspection
     clusters_sample_file = f"{basename}_sample_clusters.txt"
-    write_cluster_samples(clustering_model, data_labels, clusters_sample_file)
+    _write_cluster_samples(clusters_sample_file, clustering_model, data_labels)
 
-    # write pickle files - these are expensive so only write if you really want them
+    # dump full pickled clustering model to file - this is expensive to do!
     if args.flag_save_clusteringmodel is True:
         clusters_file = f"{basename}_clusters.pkl"
         labels_file = f"{basename}_labels.pkl"
@@ -135,15 +157,23 @@ def save_results(
 
 
 def save_averaged_results(
-    averaged_metrics, averaged_stats, configuration, args, dataset_id
-):
-    """
-    Saves all the averaged results (from the individual seeded clustering runs), writes to file with the same
-    consistency as save_results()
+    averaged_metrics: Dict[str, Dict[str, float]], averaged_stats: Dict[str, Dict[str, float]], configuration: Dict[str, Any], args: argparse.Namespace, dataset_id: str
+) -> None:
+    """Save the input arguments and averaged results across the seed-jobs to files.
+
+    Args:
+        averaged_metrics: contains the mean and std of each metric, averaged over the seed-jobs
+        averaged_stats: contains the mean and std of each cluste stat, averaged over the seed-jobs
+        configuration: The hyperparameters associated with the clustering
+        args: The argparser containing the job's arguments
+        dataset_id: unique identifier shared by all seed-
+
+    Returns:
+        (nothing)
     """
     results_file = _get_output_basename(
         args.output_dir, dataset_id
     )
     results_file += f"_summary_averaged.txt"
 
-    write_metrics(results_file, averaged_metrics, configuration, averaged_stats, args)
+    _write_metrics(results_file, averaged_metrics, configuration, averaged_stats, args)
