@@ -40,6 +40,8 @@ After a successful clustering run, the files that are output are:
 - `fanatic_<dataset-id>_<seed-run>_summary.txt` - this file is generated for each seed run and contains all input parameters and clustering results. It is effectively a summary of the entire clustering run, allowing you to quickly parse results and/or recreate the job. Can be consumed by [configparser](https://docs.python.org/3.7/library/configparser.html).
 - `fanatic_<dataset-id>_summary_averaged.txt` - this file is generated once for a dataset-id and contains the input arguments and averaged results across the individual seed runs. 
 
+In addition, the full clustering model can be dumped to pickle for deep investigation if desired by adding `--flag-save-clusteringmodel`. Warning that, especially for large datasets, this file is very large.
+
 ### Use a Custom Preprocessor
 Results from the paper were generated using an in-house preprocessor that is not available to the public. Using nltk we created a similar preprocessor, housed at `fanatic/preprocess/nltk_preprocessor.py`, and inherits from `fanatic/preprocess/generic_preprocessor.py`. One is free to create a new preprocessor, inheriting from `generic_preprocessor.py`, to use more sophisticated features (e.g. BERT embeddings).
 
