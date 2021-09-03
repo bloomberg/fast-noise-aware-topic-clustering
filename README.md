@@ -11,6 +11,8 @@ In particular, this repo allows a user to:
 - Train a (word2vec) embedding model
 - Use `FANATIC` to cluster the reddit data, dumping results for downstream analysis. 
 
+Note that the original paper results used an in-house preprocessor, but a very similar open-source one has been provided (see `fanatic/preprocess/nltk_preprocessor.py`).
+
 ## How-to
 ### Download the Reddit Data
 Data can be downloaded from [pushshift](https://files.pushshift.io/reddit/submissions/) using `wget`, e.g. `wget https://files.pushshift.io/reddit/submissions/RS_2017-11.zst`. If data files are downloaded to the `data/` directory, subsequent scripts are already set up to look there. 

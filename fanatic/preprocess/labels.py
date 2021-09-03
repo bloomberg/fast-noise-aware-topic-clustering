@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
-NOISE_LABEL = "NOISE_LABEL"  # label to assign to noise subreddits
+NOISE_LABEL = "NOISE_LABEL"                     # label to assign to noise subreddits
 DEFAULT_MAX_N_READ_FOR_NOISE_FILTER = 10000000  # just a very large number
 
 

@@ -3,7 +3,7 @@ import random
 import time
 import uuid
 from itertools import combinations
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, FrozenSet, List, Optional, Tuple
 
 import numpy as np
 import scipy.spatial
@@ -18,9 +18,17 @@ logger = logging.getLogger(__name__)
 
 
 class FanaticClusterModel(ClusteringModel):
-    def consume_config(self, config: Dict):
+    def consume_config(self, config: Dict[str, Any]) -> None:
+        """Consume the configuration with the hyperparameters.
+
+        Args:
+            config: configuration containing the hyperparameters.
+
+        Returns:
+            (nothing)
+        """
         self.clustering_threshold = config["clustering_threshold"]
-        self.min_term_probability = config["min_term_probability"]
+        self.min_token_probability = config["min_token_probability"]
         self.max_num_clusters = config["max_num_clusters"]
         self.distance_metric = config["distance_metric"]
         self.merge_close_clusters_max_iterations = config[
@@ -36,10 +44,19 @@ class FanaticClusterModel(ClusteringModel):
     def reassign_documents(
         self,
         clustering_threshold: float,
-        min_term_probability: float,
+        min_token_probability: float,
         distance_metric: str,
-    ) -> int:
-        """Reassign documents of filtered clusters to the clusters that remain."""
+    ) -> None:
+        """Reassign documents of filtered clusters to the clusters that remain.
+        
+        Args:
+            clustering_threshold: "lambda" parameter that determines cluster size.
+            min_token_probability: The token probability required to add a document to existing cluster.
+            distance_metric: metric used for calculating distance.
+
+        Returns:
+            (nothing)
+        """
         reassigned_doc_cnt = 0
         if self.clusters:
             cluster_vectors = np.vstack(cluster.center for cluster in self.clusters)
@@ -60,7 +77,7 @@ class FanaticClusterModel(ClusteringModel):
                                     for t in document.tokens
                                 )
                                 / float(len(document.tokens))
-                                >= min_term_probability
+                                >= min_token_probability
                             )
                         )
                         cluster = self.clusters[idx]
@@ -72,10 +89,18 @@ class FanaticClusterModel(ClusteringModel):
                         reassigned_doc_cnt += 1
                     except StopIteration:
                         pass
-        return reassigned_doc_cnt
+        logger.info(f"{str(reassigned_doc_cnt)} documents reassigned")
+
 
     def filter_small_clusters(self, min_cluster_size: int) -> None:
-        """Filter out clusters with size below `min_cluster_size`."""
+        """Filter out clusters with size below `min_cluster_size`.
+        
+        Args:
+            min_cluster_size: the minimum required cluster size.
+
+        Returns:
+            (nothing)
+        """
         for cluster in self.clusters:
             if cluster.size() < min_cluster_size:
                 for document in cluster.documents:
@@ -93,23 +118,23 @@ class FanaticClusterModel(ClusteringModel):
         merge_close_clusters_max_iterations: int,
         merge_close_clusters_lambda_fraction: int,
         distance_metric: str,
-    ) -> Tuple[np.ndarray, int]:
+    ) -> np.ndarray:
         """
-        After each clustering iteration, this function merges clusters that are less than
-        clustering_threshold * merge_close_clusters_lambda_fraction apart from each other. Per "merge iteration", each cluster can only be
-        involved in a single merge. merge_close_clusters_max_iterations sets the number of maximum rounds.
-        **Issue** if merge_close_clusters_max_iterations > 1: since new cluster center is weighted by n_documents,
-        if multiple merge rounds the original cluster has already been moved, what are its "documents" now?
-        merge_close_clusters_max_iterations should probably just stay at 1...
+        Merge clusters that are less than `clustering_threshold` * `merge_close_clusters_lambda_fraction` apart from each other. 
+         
+        Per "merge iteration", each cluster can only be involved in a single merge. See paper for additional details.
+        NOTE: code has only been tested with `merge_close_clusters_max_iterations`=1: 
+
         Args:
-            cluster_vectors (array of vectors): array of cluster centers
-            clustering_threshold (float): cluster size (lambda)
-            merge_close_clusters_max_iterations (int): max number of iterations (or "rounds") to run the merge algorithm
-            merge_close_clusters_lambda_fraction (float): merge clusters that are clustering_threshold * merge_close_clusters_lambda_fraction apart
-            distance_metric (string): The distance metric used in the clustering algorithm ('euclidean' or 'cosine')
+            cluster_vectors: array of cluster centers
+            clustering_threshold: "lambda" parameter that determines cluster size.
+            merge_close_clusters_max_iterations: max number of iterations to run the merge algorithm
+            merge_close_clusters_lambda_fraction: merge clusters that are clustering_threshold * merge_close_clusters_lambda_fraction apart
+            distance_metric: metric used for calculating distance
+
         Returns:
-            cluster_vectors (array of vectors): updated array of cluster centers (post merging)
-            n_merged_total (int): count of number of clusters that were merged (for stats purposes)
+            cluster_vectors: updated array of cluster centers (post merging)
+            n_merged_total: count of number of clusters that were merged (for stats purposes)
         """
         merge_clusters_start_time = time.time()
         clusters_merged_in_last_iteration = True
@@ -189,14 +214,17 @@ class FanaticClusterModel(ClusteringModel):
         logger.info(
             f"{n_clusters_merged_total} total merged clusters time from {merge_iterations} iterations taking {time.time() - merge_clusters_start_time} s"
         )
-        return cluster_vectors, n_clusters_merged_total
+        return cluster_vectors
 
     def filter_and_recalculate_cluster_centers(self) -> Tuple[float, np.ndarray]:
-        """
-        Filters out empty clusters and recalculates cluster centers.
+        """Filter out empty clusters and recalculate cluster centers.
+
+        Args:
+            (nothing)
+
         Returns:
-            cluster_center_change (float): average change in cluster centers, weighted by number of inquiries in each cluster.
-            cluster_vectors (array of vectors): array of cluster centers
+            cluster_center_change: avg. change in cluster centers weighted by number of inquiries per cluster.
+            cluster_vectors: array of cluster centers
         """
         # filter out empty clusters
         self.clusters = [
@@ -232,30 +260,32 @@ class FanaticClusterModel(ClusteringModel):
 
     def assign_documents_to_fixed_clusters(
         self,
-        document_keys: List,
+        document_keys: List[FrozenSet],
         cluster_vectors: np.ndarray,
         clustering_threshold: float,
-        min_term_probability: float,
+        min_token_probability: float,
         distance_metric: str,
         flag_update_documents: bool,
         batch_size: int = 150000,
     ) -> None:
         """
-        Assigns (the remaining) documents to fixed clusters (i.e. no new clusters can be made), done significantly
-        faster than the single-document-per-loop way.
+        Assigns (the remaining) documents to static clusters, i.e. max_num_clusters has been reached and no new clusters can be made.
+        Optimized to be faster than the single-document-per-loop way.
 
         Args:
-            document_keys (list of frozensets): The keys of the documents that will be assigned to the clusters
-            cluster_vectors (array of vectors): array of cluster centers
-            clustering_threshold (float): the distance at which to create a new cluster
-            min_term_probability (float, optional): the minimum average term probability required across a cluster
-            distance_metric (string): scipy.spatial distance metric to use (euclidean vs. cosine)
-            batch_size (int, optional): How many documents to cdist at a time (more docs = more memory)
-            flag_update_documents (bool, optional): if True, update document objects too (only used for final document assignment)
+            document_keys: The (remaining) document keys that will be assigned to the fixed clusters
+            cluster_vectors: array of cluster centers
+            clustering_threshold: "lambda" parameter that determines cluster size.
+            min_token_probability: The token probability required to add a document to existing cluster.
+            distance_metric: metric used for calculating distance.
+            flag_update_documents: if True, update document objects too (only set to True for final document assignment)
+            batch_size: How many documents to cdist at a time (more docs = more memory needed)
+
+        Returns:
+            (nothing)
         """
-        # setup
+        # init
         cluster_idx = np.arange(len(cluster_vectors))
-        batch_size = int(batch_size)  # just in case
         n_documents = len(document_keys)
         if batch_size is None:
             batch_size = n_documents
@@ -299,7 +329,7 @@ class FanaticClusterModel(ClusteringModel):
                                 for t in document.tokens
                             )
                             / float(len(document.tokens))
-                            >= min_term_probability
+                            >= min_token_probability
                         )
                     )
                     cluster = self.clusters[idx]
@@ -317,10 +347,14 @@ class FanaticClusterModel(ClusteringModel):
 
     def initialize_clustering(self) -> Tuple[np.ndarray, List]:
         """
-        Initialize the clustering algorithm
+        Initialize the clustering algorithm.
+        
+        Args:
+            (nothing)
+
         Returns:
-            cluster_vectors (list of vectors): list containing a single cluster (mean of all document vectors)
-            document_keys (list of frozensets): Each frozenset is the key for each document
+            cluster_vectors: houses the cluster centers (initialized with a single cluster as mean of all document vectors)
+            document_keys: the frozenset key associated with each document
         """
 
         # initialize all documents to belong to same cluster
@@ -339,10 +373,15 @@ class FanaticClusterModel(ClusteringModel):
         return cluster_vectors, document_keys
 
     # cluster
-    def cluster(self, seed: int) -> Dict:
-        """Cluster documents within this dataset
-        Cluster the documents, using the algorithm in Kulis and Jordan, "Revisiting k-means: New Algorithms via Bayesian Nonparametrics", https://icml.cc/2012/papers/291.pdf
-        The algorithm is iterative, where a new cluster is created if a data point is more than lambda away from all existing clusters
+    def cluster(self, seed: int) -> Dict[str, Any]:
+        """MAIN driver that performs a FANATIC clustering against a set of input documents. 
+        See Silburt et al. (2021) published in EMNLP for more details.
+
+        Args:
+            seed: random seed to shuffle the document order.
+
+        Returns:
+            stats: stats object containing timing of the clustering.
         """
 
         # initialize
@@ -351,7 +390,7 @@ class FanaticClusterModel(ClusteringModel):
         random.seed(seed)
         cluster_vectors, document_keys = self.initialize_clustering()
 
-        # MAIN LOOP: DP Means until convergence or time limit reached
+        # MAIN LOOP: Perform FANATIC clustering until convergence or time limit reached
         while True:
             # check for time limit
             if (time.time() - start_time) > self.max_clustering_time:
@@ -387,7 +426,7 @@ class FanaticClusterModel(ClusteringModel):
                                 for t in document.tokens
                             )
                             / float(len(document.tokens))
-                            >= self.min_term_probability
+                            >= self.min_token_probability
                         )
                     )
                     cluster = self.clusters[idx]
@@ -402,14 +441,13 @@ class FanaticClusterModel(ClusteringModel):
                         self.clusters.append(cluster)
                         cluster_vectors = np.vstack((cluster_vectors, cluster.center))
                     else:
-                        # max clusters reached, thus document is not added to any cluster -
-                        # re-assign remaining documents in a vectorized way (faster), then leave loop
+                        # max clusters reached, thus document is not added to any cluster - re-assign remaining documents in a vectorized way (faster), then exit
                         remaining_document_keys = document_keys[doc_i:]
                         self.assign_documents_to_fixed_clusters(
                             document_keys=remaining_document_keys,
                             cluster_vectors=cluster_vectors,
                             clustering_threshold=self.clustering_threshold,
-                            min_term_probability=self.min_term_probability,
+                            min_token_probability=self.min_token_probability,
                             distance_metric=self.distance_metric,
                             flag_update_documents=False,
                             batch_size=self.batch_size,
@@ -437,7 +475,7 @@ class FanaticClusterModel(ClusteringModel):
 
             # find cluster pairs with distances less than lambda and merge
             if self.merge_close_clusters_max_iterations > 0:
-                cluster_vectors, n_clusters_merged = self.detect_and_merge_clusters(
+                cluster_vectors = self.detect_and_merge_clusters(
                     cluster_vectors,
                     self.clustering_threshold,
                     self.merge_close_clusters_max_iterations,
@@ -453,7 +491,7 @@ class FanaticClusterModel(ClusteringModel):
             document_keys=document_keys,
             cluster_vectors=cluster_vectors,
             clustering_threshold=self.clustering_threshold,
-            min_term_probability=self.min_term_probability,
+            min_token_probability=self.min_token_probability,
             distance_metric=self.distance_metric,
             flag_update_documents=True,
             batch_size=self.batch_size,
@@ -475,12 +513,11 @@ class FanaticClusterModel(ClusteringModel):
         n_clusters_diff_filtering = n_clusters_before_filter - len(self.clusters)
         logger.info("Number of clusters Filtered: {}".format(n_clusters_diff_filtering))
 
-        # reassign documents that were filtered out if they can be assigned to one of the existing clusters (within threshold)
+        # reassign documents that were filtered out if they can be potentially assigned an existing cluster
         logger.info("Reassigning documents")
         reassigned_doc_cnt = self.reassign_documents(
-            self.clustering_threshold, self.min_term_probability, self.distance_metric
+            self.clustering_threshold, self.min_token_probability, self.distance_metric
         )
-        logger.info(f"{str(reassigned_doc_cnt)} documents reassigned")
 
         # cluster stats object
         self.stats["cluster_time"] = time.time() - start_time

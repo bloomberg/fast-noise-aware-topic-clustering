@@ -77,7 +77,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument('--clustering-threshold', type=float,
                         default=0.45,
                         help='Clustering lambda threshold')
-    parser.add_argument('--min-term-probability', type=_restricted_float,
+    parser.add_argument('--min-token-probability', type=_restricted_float,
                         default=0.01,
                         help='Minimum average term probability required across a cluster')
     parser.add_argument('--max-num-clusters', type=int,
@@ -124,7 +124,7 @@ def parse_args() -> argparse.Namespace:
 def build_algorithm_config(args: argparse.Namespace) -> Dict[str, Any]:
     config = {
         "clustering_threshold": args.clustering_threshold,
-        "min_term_probability": args.min_term_probability,
+        "min_token_probability": args.min_token_probability,
         "max_num_clusters": args.max_num_clusters,
         "distance_metric": args.distance_metric,
         "min_cluster_size": args.min_cluster_size,
