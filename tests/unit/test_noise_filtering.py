@@ -51,7 +51,7 @@ OUTPUT_DATA = {
 
 def test_noise_filtering():
     # GIVEN
-    subreddit_labels_file = "subreddit_labels.json"  # in FANATIC base dir
+    subreddit_labels_file = "data/subreddit_labels.json"  # in FANATIC base dir
     subreddit_noise_percentage = 0.5
     seed = 42
 
@@ -59,7 +59,7 @@ def test_noise_filtering():
     subreddit_labels = labels.load_subreddit_labels(subreddit_labels_file)
     data = filter_data.filter_data_by_noise_percentage(
         INPUT_DATA,
-        n_read=3,
+        num_docs_read=3,
         subreddit_noise_percentage=subreddit_noise_percentage,
         subreddit_labels=subreddit_labels,
         seed=seed,
