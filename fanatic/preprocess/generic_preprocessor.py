@@ -31,8 +31,8 @@ class GenericPreprocessor(ABC):
         """
         raise NotImplementedError
 
-    def featurize(self, data: List[Dict[str, Any]]) -> Generator[Dict[str, Any], None, None]:
-        """Featurize the data. This function is directly called by the clustering_driver.py.
+    def featurize(self, data_generator: Generator[Dict[str, Any], None, None]) -> Generator[Dict[str, Any], None, None]:
+        """Featurize the data. This function is directly called by clustering_driver.py.
         Importantly, each featurized data point must contain the following fields:
             - `id`: a unique identifier associated with each data point
             - `text`: the raw input text
