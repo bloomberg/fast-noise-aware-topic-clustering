@@ -1,35 +1,33 @@
 """Functions associated with calculating final clustering stats and metrics."""
 import logging
-import random
-import uuid
 from collections import Counter
-from typing import Any, Dict, List, FrozenSet
+from typing import Any, Dict, FrozenSet, List
 
 import numpy as np
 from sklearn.metrics import adjusted_mutual_info_score
 
-from fanatic.preprocess.labels import NOISE_LABEL
 from fanatic.clustering.clusteringcomponents import Document
+from fanatic.preprocess.labels import NOISE_LABEL
 
-logging_format = (
-    "%(asctime)s %(filename)s %(funcName)s %(lineno)d %(levelname)s %(message)s"
-)
+logging_format = "%(asctime)s %(filename)s %(funcName)s %(lineno)d %(levelname)s %(message)s"
 logging.basicConfig(level=logging.INFO, format=logging_format)
 logger = logging.getLogger(__name__)
 
 
-NO_ASSIGNMENT = (
-    "NO_ASSIGNMENT"  # label to assign to documents that did not fall into a cluster
-)
+NO_ASSIGNMENT = "NO_ASSIGNMENT"  # label to assign to documents that did not fall into a cluster
 
 
-def calculate_metrics(clustered_documents: Dict[FrozenSet, Document], data_labels: Dict[str, str], cluster_stats: Dict[str, Any]) -> Dict[str, float]:
+def calculate_metrics(
+    clustered_documents: Dict[FrozenSet, Document],
+    data_labels: Dict[str, str],
+    cluster_stats: Dict[str, Any],
+) -> Dict[str, float]:
     """Calculate final metrics and clustering stats.
 
     Args:
         clustered_documents: The clustered documents
         data_labels: document_id / label mapping for the clustered documents
-        cluster_stats: contains some stats aggregated during clustering and further filled here. 
+        cluster_stats: contains some stats aggregated during clustering and further filled here.
 
     Returns:
         metrics: the final calculated metrics
@@ -41,12 +39,8 @@ def calculate_metrics(clustered_documents: Dict[FrozenSet, Document], data_label
     # stats
     number_of_tp = 0  # number of coherent docs in clusters
     number_of_fp = 0  # number of noise docs in clusters
-    number_of_fn = (
-        0  # number of coherent docs that did not fall in a cluster
-    )
-    number_of_tn = (
-        0  # number of noise docs that did not fall in a cluster
-    )
+    number_of_fn = 0  # number of coherent docs that did not fall in a cluster
+    number_of_tn = 0  # number of noise docs that did not fall in a cluster
     cluster_ids = []
 
     # main
@@ -88,16 +82,19 @@ def calculate_metrics(clustered_documents: Dict[FrozenSet, Document], data_label
     )
 
     # calculate metrics (additional metrics can be added if desired)
-    ami_score = adjusted_mutual_info_score(
-        document_labels, document_assignments, average_method="arithmetic"
-    )
+    ami_score = adjusted_mutual_info_score(document_labels, document_assignments, average_method="arithmetic")
     metrics = {"ami": ami_score}
 
     return metrics
 
 
 def calculate_cluster_stats(
-    cluster_stats: Dict[str, Any], cluster_ids: List[str], number_of_tp: int, number_of_fp: int, number_of_tn: int, number_of_fn: int
+    cluster_stats: Dict[str, Any],
+    cluster_ids: List[str],
+    number_of_tp: int,
+    number_of_fp: int,
+    number_of_tn: int,
+    number_of_fn: int,
 ) -> None:
     """Calculate the final clustering stats.
 
@@ -120,22 +117,14 @@ def calculate_cluster_stats(
     if n_clusters > 0:
         quartiles = {
             "cluster_size_quartile_min": min(cluster_counts),
-            "cluster_size_quartile_Q1": np.percentile(
-                cluster_counts, 25, interpolation="nearest"
-            ),
-            "cluster_size_quartile_median": np.percentile(
-                cluster_counts, 50, interpolation="nearest"
-            ),
-            "cluster_size_quartile_Q3": np.percentile(
-                cluster_counts, 75, interpolation="nearest"
-            ),
+            "cluster_size_quartile_Q1": np.percentile(cluster_counts, 25, interpolation="nearest"),
+            "cluster_size_quartile_median": np.percentile(cluster_counts, 50, interpolation="nearest"),
+            "cluster_size_quartile_Q3": np.percentile(cluster_counts, 75, interpolation="nearest"),
             "cluster_size_quartile_max": max(cluster_counts),
         }
 
         # cluster size stats
-        logger.info(
-            f"Total number of clusters: {cluster_stats['total_number_of_clusters']}"
-        )
+        logger.info(f"Total number of clusters: {cluster_stats['total_number_of_clusters']}")
         logger.info(
             f"Cluster-size Quartile statistics: min={quartiles['cluster_size_quartile_min']}, "
             f"Q1={quartiles['cluster_size_quartile_Q1']}, "
@@ -156,16 +145,10 @@ def calculate_cluster_stats(
     number_of_documents_in_clusters = number_of_tp + number_of_fp
 
     # calculate pseudo precision / recall
-    if (
-        (number_of_tp + number_of_fp) > 0
-        and (number_of_tp + number_of_tn) > 0
-        and number_of_tp > 0
-    ):
+    if (number_of_tp + number_of_fp) > 0 and (number_of_tp + number_of_tn) > 0 and number_of_tp > 0:
         pseudo_precision = number_of_tp / (number_of_tp + number_of_fp)
         pseudo_recall = number_of_tp / (number_of_tp + number_of_fn)
-        pseudo_f1 = (
-            2 * pseudo_precision * pseudo_recall / (pseudo_precision + pseudo_recall)
-        )
+        pseudo_f1 = 2 * pseudo_precision * pseudo_recall / (pseudo_precision + pseudo_recall)
     else:
         pseudo_precision = 0
         pseudo_recall = 0
@@ -196,7 +179,9 @@ def calculate_cluster_stats(
     cluster_stats.update(documents_stats)
 
 
-def average_metrics_stats_from_seed_runs(aggregate_metrics: List[Dict[str, float]], aggregate_stats: List[Dict[str, Any]]):
+def average_metrics_stats_from_seed_runs(
+    aggregate_metrics: List[Dict[str, float]], aggregate_stats: List[Dict[str, Any]]
+):
     """
     Obtain the mean and standard deviation metric values from a number of seed runs
 
@@ -216,11 +201,11 @@ def average_metrics_stats_from_seed_runs(aggregate_metrics: List[Dict[str, float
             # iterate over each seed run
             try:
                 key_values.append(run[key])
-            except:
+            except Exception:
                 logger.warning(f"Couldnt find {key} in {run}")
 
         averaged_metrics[key] = {"mean": np.mean(key_values), "std": np.std(key_values)}
-    logger.info(f"****** AVERAGED Metrics ******")
+    logger.info("****** AVERAGED Metrics ******")
     logger.info(averaged_metrics)
 
     # average stats
@@ -231,7 +216,7 @@ def average_metrics_stats_from_seed_runs(aggregate_metrics: List[Dict[str, float
         for run in aggregate_stats:
             try:
                 key_values.append(run[key])
-            except:
+            except Exception:
                 logger.warning(f"Couldnt find {key} in {run}")
 
         averaged_stats[key] = {"mean": np.mean(key_values), "std": np.std(key_values)}

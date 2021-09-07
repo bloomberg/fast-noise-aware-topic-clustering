@@ -1,7 +1,7 @@
 # FANATIC
 FAst Noise-Aware TopIc Clustering
 
-Authors: Ari Silburt, Anja Subasic, Evan Thompson, Carmeline Dsilva
+Authors: Ari Silburt, Anja Subasic, Evan Thompson, Carmeline Dsilva, Tarec Fares
 
 ## General
 This repo contains the research code and scripts used in the paper [FANATIC: FAst Noise-Aware TopIc Clustering](), and provides a basic overview of the code structure and its major components. For more questions, please directly contact the authors.

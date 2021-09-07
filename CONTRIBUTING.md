@@ -1,0 +1,2 @@
+# Contribution
+This repository is meant to be a point-in-time code reference for the clutering algorithm implemented in the Silburt et al. (2021) EMNLP Publication titled "FANATIC: FAst Noise-Aware TopIc Clustering". At this time, this repo will not be actively maintained. Improvements, suggestions and PRs are welcome but there is no guarantee that they will be incorporated in a timely manner, if at all.

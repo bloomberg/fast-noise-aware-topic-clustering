@@ -6,22 +6,20 @@ from typing import Any, Dict, List, Optional
 
 import zstandard as zstd
 
-logging_format = (
-    "%(asctime)s %(filename)s %(funcName)s %(lineno)d %(levelname)s %(message)s"
-)
+logging_format = "%(asctime)s %(filename)s %(funcName)s %(lineno)d %(levelname)s %(message)s"
 logging.basicConfig(level=logging.INFO, format=logging_format)
 logger = logging.getLogger(__name__)
 
 # dataset field definitions
-DATASET_INPUT_FIELD = "title"           # defines the field containing the input text
-DATASET_LABEL_FIELD = "subreddit"       # defines the field containing the label
-DATASET_ID_FIELD = "id"                 # defines the field containing the unique identifier
+DATASET_INPUT_FIELD = "title"  # defines the field containing the input text
+DATASET_LABEL_FIELD = "subreddit"  # defines the field containing the label
+DATASET_ID_FIELD = "id"  # defines the field containing the unique identifier
 
 
 def read_file(
     data_file: str,
     data: Dict,
-    n_read: Optional[int] = None,
+    num_docs_read: Optional[int] = None,
     min_valid_tokens: int = 3,
     subreddit_labels_list: Optional[List] = None,
 ) -> int:
@@ -30,7 +28,7 @@ def read_file(
     Args:
         data_file: File path to data file
         data: Dict to store data
-        n_read: Number of valid lines to read (filtered lines don't count). Set to None to read everything
+        num_docs_read: Number of valid lines to read (filtered lines don't count). Set to None to read everything
         min_valid_tokens: minimum number of tokens required to add to the dataset.
         subreddit_labels_list: When specified, restrict the data universe to these labels
 
@@ -45,12 +43,13 @@ def read_file(
     ids = set()
 
     with open(data_file, "rb") as fh:
-        # basic code to read in zst files from: https://www.reddit.com/r/pushshift/comments/ajmcc0/information_and_code_examples_on_how_to_use_the/ef012vk/
+        # basic code to read in zst files from:
+        # https://www.reddit.com/r/pushshift/comments/ajmcc0/information_and_code_examples_on_how_to_use_the/ef012vk/
         dctx = zstd.ZstdDecompressor(max_window_size=2147483648)
         with dctx.stream_reader(fh) as reader:
             previous_line = ""
             while True:
-                if n_read is not None and read_lines >= n_read:
+                if num_docs_read is not None and read_lines >= num_docs_read:
                     break
 
                 chunk = reader.read(2 ** 24)  # 16mb chunks
@@ -66,18 +65,13 @@ def read_file(
                     try:
                         json_line = json.loads(line)
                         title = str(
-                            json_line[DATASET_INPUT_FIELD]
-                            .encode(encoding="UTF-8", errors="strict")
-                            .decode("UTF-8")
+                            json_line[DATASET_INPUT_FIELD].encode(encoding="UTF-8", errors="strict").decode("UTF-8")
                         )
                         label = json_line[DATASET_LABEL_FIELD]
                         id = json_line[DATASET_ID_FIELD]
 
                         # if provided, restrict data universe to labels in subreddit_labels_list
-                        if (
-                            subreddit_labels_list is not None
-                            and label not in subreddit_labels_list
-                        ):
+                        if subreddit_labels_list is not None and label not in subreddit_labels_list:
                             continue
 
                         # filter out very short titles
@@ -98,9 +92,9 @@ def read_file(
                         ids.add(id)
                         read_lines += 1
 
-                        if n_read is not None and read_lines >= n_read:
+                        if num_docs_read is not None and read_lines >= num_docs_read:
                             break
-                    except:
+                    except Exception:
                         failed_lines += 1
 
                     if i % 1000 == 0:
@@ -118,7 +112,7 @@ def read_file(
 
 def read_files(
     data_files: List[str],
-    n_read: Optional[int] = None,
+    num_docs_read: Optional[int] = None,
     min_valid_tokens: int = 3,
     subreddit_labels_list: Optional[List] = None,
 ) -> Dict[str, List]:
@@ -126,7 +120,7 @@ def read_files(
 
     Args:
         data_files: List of data file paths
-        n_read: Number of valid lines to read (filtered lines don't count). Set to None to read everything
+        num_docs_read: Number of valid lines to read (filtered lines don't count). Set to None to read everything
         min_valid_tokens: minimum number of tokens required to add to the dataset.
         subreddit_labels_list: When specified, restrict the data universe to these labels
 
@@ -134,18 +128,18 @@ def read_files(
         data: the read-in data
     """
     data: Dict[str, Any] = {}
-    n_read_remaining = n_read  # remaining lines left to read
+    num_docs_read_remaining = num_docs_read  # remaining lines left to read
     for data_file in data_files:
         valid_titles_read = read_file(
             data_file,
             data,
-            n_read=n_read_remaining,
+            num_docs_read=num_docs_read_remaining,
             min_valid_tokens=min_valid_tokens,
             subreddit_labels_list=subreddit_labels_list,
         )
         logger.info(f"Completed reading data file: {data_file}")
-        if n_read_remaining is not None:
-            n_read_remaining -= valid_titles_read
-            if n_read_remaining <= 0:
+        if num_docs_read_remaining is not None:
+            num_docs_read_remaining -= valid_titles_read
+            if num_docs_read_remaining <= 0:
                 break
     return data

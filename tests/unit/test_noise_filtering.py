@@ -1,4 +1,4 @@
-from fanatic.preprocess import labels, filter_data
+from fanatic.preprocess import filter_data, labels
 
 INPUT_DATA = {
     "bayarea": [

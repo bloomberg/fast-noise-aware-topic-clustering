@@ -5,12 +5,12 @@ from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
-NOISE_LABEL = "NOISE_LABEL"                     # label to assign to noise subreddits
+NOISE_LABEL = "NOISE_LABEL"  # label to assign to noise subreddits
 DEFAULT_MAX_N_READ_FOR_NOISE_FILTER = 10000000  # just a very large number
 
 
 def load_subreddit_labels(subreddit_labels_file: str) -> Dict[str, str]:
-    """Load mapping between subreddit and label. Noise subreddits get a NOISE_LABEL and otherwise the subreddit is the label.
+    """Load mapping between subreddit and label. Noise subreddits get NOISE_LABEL and otherwise the subreddit is the label.
 
     Args:
         subreddit_labels_file (str): Filepath of the subreddit_labels file
@@ -45,7 +45,9 @@ def load_subreddit_labels(subreddit_labels_file: str) -> Dict[str, str]:
     return subreddit_labels
 
 
-def prepare_final_dataset_and_labels(data: Dict[str, Any], subreddit_labels: Optional[Dict[str, str]] = None) -> Tuple[List[Dict], Dict[str, str]]:
+def prepare_final_dataset_and_labels(
+    data: Dict[str, Any], subreddit_labels: Optional[Dict[str, str]] = None
+) -> Tuple[List[Dict], Dict[str, str]]:
     """Prepare dataset and labels for clustering. Determine a 'derived' label from the subreddit_labels.
 
     Args:
@@ -58,15 +60,11 @@ def prepare_final_dataset_and_labels(data: Dict[str, Any], subreddit_labels: Opt
     """
     final_derived_labels = {}
     final_data = []
-    for subreddit, data in data.items():
-        for title in data:
+    for subreddit, subreddit_data in data.items():
+        for title in subreddit_data:
             # if we have annotations available, use them to get a more informed label,
             # otherwise use the subreddit as the label
-            derived_label = (
-                subreddit_labels[subreddit]
-                if subreddit_labels is not None
-                else subreddit
-            )
+            derived_label = subreddit_labels[subreddit] if subreddit_labels is not None else subreddit
 
             # prepare title / label
             final_derived_labels[title["id"]] = derived_label
