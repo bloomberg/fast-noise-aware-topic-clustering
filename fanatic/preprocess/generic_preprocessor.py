@@ -16,9 +16,6 @@ from typing import Any, Dict, Generator, List
 class GenericPreprocessor(ABC):
     """Generic interface for preprocessing data."""
 
-    def __init__(self):
-        pass
-
     def preprocess(self, data: List[Dict[str, Any]]) -> Generator[Dict[str, Any], None, None]:
         """Preprocess the documents.
         'norm_tokens' field must be present in output if using the embedding_driver.py to train a Word2Vec model.
