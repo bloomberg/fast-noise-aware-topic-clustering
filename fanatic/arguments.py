@@ -111,16 +111,22 @@ def parse_args() -> argparse.Namespace:
 
     # fanatic algorithm arguments
     parser.add_argument(
-        "--clustering-threshold",
+        "--clustering-lambda",
         type=float,
         default=0.45,
         help="Clustering lambda threshold",
     )
     parser.add_argument(
-        "--min-token-probability",
+        "--token-probability-threshold",
         type=_restricted_float,
         default=0.01,
-        help="Minimum average term probability required across a cluster",
+        help="Minimum token probability required to add a document to an existing cluster",
+    )
+    parser.add_argument(
+        "--distance-metric",
+        choices=["euclidean", "cosine"],
+        default="cosine",
+        help="Distance metric used to calculate vector distances",
     )
     parser.add_argument(
         "--max-num-clusters",
@@ -130,16 +136,10 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--min-cluster-size", type=int, default=50, help="Minimum cluster size")
     parser.add_argument(
-        "--distance-metric",
-        choices=["euclidean", "cosine"],
-        default="cosine",
-        help="Distance metric used to calculate vector distances",
-    )
-    parser.add_argument(
         "--merge-close-clusters-max-iterations",
         type=int,
         default=1,
-        help="Max number of cluster merge iterations per DPMeans cluster loops.",
+        help="Maximum number of cluster-merge rounds",
     )
     parser.add_argument(
         "--merge-close-clusters-lambda-fraction",
@@ -187,8 +187,8 @@ def parse_args() -> argparse.Namespace:
 
 def build_algorithm_config(args: argparse.Namespace) -> Dict[str, Any]:
     config = {
-        "clustering_threshold": args.clustering_threshold,
-        "min_token_probability": args.min_token_probability,
+        "clustering_lambda": args.clustering_lambda,
+        "token_probability_threshold": args.token_probability_threshold,
         "max_num_clusters": args.max_num_clusters,
         "distance_metric": args.distance_metric,
         "min_cluster_size": args.min_cluster_size,

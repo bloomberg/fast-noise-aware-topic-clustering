@@ -4,7 +4,7 @@ FAst Noise-Aware TopIc Clustering
 Authors: Ari Silburt, Anja Subasic, Evan Thompson, Carmeline Dsilva, Tarec Fares
 
 ## General
-This repo contains the research code and scripts used in the paper [FANATIC: FAst Noise-Aware TopIc Clustering](), and provides a basic overview of the code structure and its major components. For more questions, please directly contact the authors.
+This repo contains the research code and scripts used in the Silburt et al. (2021) paper "FANATIC: FAst Noise-Aware TopIc Clustering", and provides a basic overview of the code structure and its major components. For more questions, please directly contact the authors.
 
 In particular, this repo allows a user to:
 - Download the reddit data
@@ -23,26 +23,34 @@ It is recommended to create a fresh python virual environment and run the follow
 pip install --upgrade pip
 pip install -r requirements.txt
 ```
+And then in a python shell do:
+```python
+import nltk
+nltk.download('stopwords')
+```
+
 This repo has been tested against `python3.7`.
 
 ### Download the Reddit Data
 Data can be downloaded from [pushshift](https://files.pushshift.io/reddit/submissions/) using `wget`, e.g. `wget https://files.pushshift.io/reddit/submissions/RS_2017-11.zst`. If data files are downloaded to the `data/` directory, subsequent scripts are already set up to look there. 
 
 ### Training a Word2vec Embedding
-A new word2vec model can be trained using `entrypoints/embedding_driver.py`, it is recommended to carefully inspect the arguments before running. In particular, a Reddit data file(s) must first be downloaded and specified in the `--data-files` argument. 
+A new word2vec model can be trained using `embedding_driver.py`, and it is recommended to carefully inspect the arguments before running. In particular, a Reddit data file(s) must first be downloaded and specified in the `--data-files` argument. 
 
 ### Cluster via FANATIC
-Once the data has been downloaded and word2vec model trained, a clustering run can be performed using the `entrypoints/clustering_driver.py` script. All input arguments are specified in the `parse_args` function of `fanatic/arguments.py` including data, label, preprocessing, fanatic and output arguments. 
+Once the data has been downloaded and word2vec model trained, a clustering run can be performed using the `clustering_driver.py` script. All input arguments are specified in the `parse_args` function of `fanatic/arguments.py` including data, label, preprocessing, clustering algorithm and output arguments. 
+
+See the Silburt et al. (2021) paper for a detailed explanation of FANATIC's hyperparameters.
 
 #### Clustering labels
-By default, the data is clustered against `data/subreddit_labels.json`, which indicates:
-- what subreddits are considered for clustering (all other subreddits are discarded)
-- whether the subreddit is a coherent or noise topic (all noise topics are assigned a `NOISE` label). 
-These labels can be substituted for different ones, or removed entirely by setting `--subreddit-labels-file None`. 
+By default, the data is clustered against the `data/subreddit_labels.json` labels file, which indicates:
+- what subreddits are considered for clustering (all other subreddits are discarded).
+- whether the subreddit is a coherent or noise topic, where all noise topics are assigned the same `NOISE` label. 
 
-In the case where subreddit labels are not provided, each subreddit becomes its own valid topic and the concept of noise is eliminated. 
+The `data/subreddit_labels.json` labels file can be substituted for a different one, or a labels file can be ignored entirely by setting `--subreddit-labels-file None`. In the case where subreddit labels are not provided, all subreddits encountered are used, each subreddit becomes its own coherent topic, and the concept of "topic noise" disappears. 
 
-In the case where subreddit labels are provided but `--subreddit-noise-percentage` is set to `None`, the noise percentage is set by the natural data distribution.
+When a subreddit labels file is provided, the `--subreddit-noise-percentage` argument sets the fraction of documents that come from noise subreddits. In the case where `--num-docs-read` and `--subreddit-noise-percentage` are incompatible with each other, `--num-docs-read` is reduced to honour the specified `--subreddit-noise-percentage`. If `--subreddit-noise-percentage` is set to `None`, the noise percentage is set by the natural data distribution. 
+
 
 #### Clustering Outputs
 After a successful clustering run, the files that are output are:
@@ -53,11 +61,15 @@ After a successful clustering run, the files that are output are:
 
 In addition, the full clustering model can be dumped to pickle for deep investigation if desired by adding `--flag-save-clusteringmodel`. Warning that, especially for large datasets, this file is very large.
 
-### Use a Custom Preprocessor
-Results from the paper were generated using an in-house preprocessor that is not available to the public. Using nltk we created a similar preprocessor, housed at `fanatic/preprocess/nltk_preprocessor.py`, and inherits from `fanatic/preprocess/generic_preprocessor.py`. One is free to create a new preprocessor, inheriting from `generic_preprocessor.py`, to use more sophisticated features (e.g. BERT embeddings).
+### Custom Preprocessor / Featurizer
+Results from the paper were generated using an in-house preprocessor that is not available to the public. Using nltk we created a very similar preprocessor, located at `fanatic/preprocess/nltk_preprocessor.py`, and inherits from `fanatic/preprocess/generic_preprocessor.py`. Users are free to create their own custom preprocessors, inheriting from `generic_preprocessor.py`, and experiment with more sophisticated features (e.g. BERT embeddings).
+
+In particular: 
+- the `.preprocess()` method is called in `embedding_driver.py` and the returned data must have a `norm_tokens` field.
+- the `.featurize()` method is called in `clustering_driver.py` and the returned data must have `id`, `text`, `clustering_tokens` and `embedding` fields. 
 
 ### Use Non-Reddit Data
-One is free to substitute or modify `fanatic/preprocess/read_data.py` to read in different kinds of data. In particular, `DATASET_INPUT_FIELD`, `DATASET_LABEL_FIELD` and `DATASET_ID_FIELD` are the essential fields that must be populated for downstream preprocessing and clustering. 
+Users are encouraged to substitute or modify `fanatic/preprocess/read_data.py` to read in different kinds of data. In particular, `DATASET_INPUT_FIELD`, `DATASET_LABEL_FIELD` and `DATASET_ID_FIELD` must be used to extract the relevant content from the raw data for downstream preprocessing and clustering. 
 
 ## Tests
 Some basic unit tests can be run from the home directory with `python3.7 -m pytest tests/unit/`
