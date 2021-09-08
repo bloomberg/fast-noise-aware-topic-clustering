@@ -121,10 +121,10 @@ def calculate_cluster_stats(
     # cluster-size distribution stats
     clusters = Counter(cluster_ids)
     cluster_counts = list(clusters.values())
-    n_clusters = len(clusters)
-    cluster_stats["total_number_of_clusters"] = n_clusters
+    num_clusters = len(clusters)
+    cluster_stats["total_number_of_clusters"] = num_clusters
 
-    if n_clusters > 0:
+    if num_clusters > 0:
         quartiles = {
             "cluster_size_quartile_min": min(cluster_counts),
             "cluster_size_quartile_Q1": np.percentile(cluster_counts, 25, interpolation="nearest"),
@@ -146,7 +146,7 @@ def calculate_cluster_stats(
         cluster_stats.update(quartiles)
 
     # document clustered stats
-    n_documents = number_of_tp + number_of_fp + number_of_tn + number_of_fn
+    num_documents = number_of_tp + number_of_fp + number_of_tn + number_of_fn
 
     # number of docs that had a coherent subreddit label (and should have ended up in a cluster)
     number_of_coherent_labels = number_of_tp + number_of_fn
@@ -165,19 +165,19 @@ def calculate_cluster_stats(
         pseudo_f1 = 0
 
     documents_stats = {
-        "n_total_documents": n_documents,
-        "n_coherent_labels": number_of_coherent_labels,
-        "coherent_labels_fraction": number_of_coherent_labels / n_documents,
-        "n_docs_clustered": number_of_documents_in_clusters,
-        "docs_clustered_fraction": number_of_documents_in_clusters / n_documents,
-        "n_tp": number_of_tp,
-        "tp_fraction": number_of_tp / n_documents,
-        "n_fp": number_of_fp,
-        "fp_fraction": number_of_fp / n_documents,
-        "n_tn": number_of_tn,
-        "tn_fraction": number_of_tn / n_documents,
-        "n_fn": number_of_fn,
-        "fn_fraction": number_of_fn / n_documents,
+        "num_total_documents": num_documents,
+        "num_coherent_labels": number_of_coherent_labels,
+        "coherent_labels_fraction": number_of_coherent_labels / num_documents,
+        "num_docs_clustered": number_of_documents_in_clusters,
+        "docs_clustered_fraction": number_of_documents_in_clusters / num_documents,
+        "num_tp": number_of_tp,
+        "tp_fraction": number_of_tp / num_documents,
+        "num_fp": number_of_fp,
+        "fp_fraction": number_of_fp / num_documents,
+        "num_tn": number_of_tn,
+        "tn_fraction": number_of_tn / num_documents,
+        "num_fn": number_of_fn,
+        "fn_fraction": number_of_fn / num_documents,
         "pseudo_precision": pseudo_precision,
         "pseudo_recall": pseudo_recall,
         "pseudo_f1": pseudo_f1,
