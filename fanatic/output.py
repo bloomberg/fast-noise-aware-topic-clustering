@@ -19,7 +19,9 @@ from typing import Any, Dict
 
 from fanatic.clustering.clusteringcomponents import ClusteringModel
 
-logging_format = "%(asctime)s %(filename)s %(funcName)s %(lineno)d %(levelname)s %(message)s"
+logging_format = (
+    "%(asctime)s %(filename)s %(funcName)s %(lineno)d %(levelname)s %(message)s"
+)
 logging.basicConfig(level=logging.INFO, format=logging_format)
 logger = logging.getLogger(__name__)
 
@@ -87,7 +89,9 @@ def _write_metrics(
     logger.info("Wrote metrics, configuration, stats")
 
 
-def _write_labels_and_assignments(write_name: str, clustering_model: ClusteringModel, data_labels: Dict[str, str]):
+def _write_labels_and_assignments(
+    write_name: str, clustering_model: ClusteringModel, data_labels: Dict[str, str]
+):
     """Dump cluster assignments and labels so one can recalculate metrics without re-running the (expensive) clustering job.
 
     Args:
@@ -103,7 +107,9 @@ def _write_labels_and_assignments(write_name: str, clustering_model: ClusteringM
     for doc in clustering_model.documents.values():
         for document_id in doc.document_ids:
             labels_and_assignments_dict[str(document_id)] = {
-                "assignment": doc.cluster_id if doc.cluster_id is None else str(doc.cluster_id),
+                "assignment": doc.cluster_id
+                if doc.cluster_id is None
+                else str(doc.cluster_id),
                 "label": str(data_labels[document_id]),
             }
 
@@ -148,7 +154,9 @@ def save_results(
 
     # write all document labels and assignments to file
     labels_and_assignments_file = f"{basename}_labels_and_assignments.json"
-    _write_labels_and_assignments(labels_and_assignments_file, clustering_model, data_labels)
+    _write_labels_and_assignments(
+        labels_and_assignments_file, clustering_model, data_labels
+    )
 
     # write the clustering summary to file - input arguments, clustering stats, clustering metrics
     results_file = f"{basename}_summary.txt"

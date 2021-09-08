@@ -15,7 +15,9 @@ from typing import Any, Dict, FrozenSet, Generator, List
 
 import numpy as np
 
-logging_format = "%(asctime)s %(filename)s %(funcName)s %(lineno)d %(levelname)s %(message)s"
+logging_format = (
+    "%(asctime)s %(filename)s %(funcName)s %(lineno)d %(levelname)s %(message)s"
+)
 logging.basicConfig(level=logging.INFO, format=logging_format)
 logger = logging.getLogger(__name__)
 
@@ -59,9 +61,13 @@ class ClusterHandler:
         self.clustering_model.set_document_weights()
 
         logger.info("Setting Convergence (Clustering) limits")
-        self.clustering_model.set_convergence_limits(convergence_patience, convergence_improvement_threshold)
+        self.clustering_model.set_convergence_limits(
+            convergence_patience, convergence_improvement_threshold
+        )
 
-    def _add_documents(self, featurized_data: Generator[Dict[str, Any], None, None]) -> None:
+    def _add_documents(
+        self, featurized_data: Generator[Dict[str, Any], None, None]
+    ) -> None:
         """Converts featurized data into Documents, which are the required input to the clustering algorithm
 
         Args:
@@ -189,7 +195,9 @@ class Cluster:
                 for token in document.tokens:
                     token_ctr[token] += document.weight
             num_documents = sum(document.weight for document in self.documents)
-            self.token_probability = {k: v / num_documents for k, v in token_ctr.items()}
+            self.token_probability = {
+                k: v / num_documents for k, v in token_ctr.items()
+            }
 
     def get_document_ids(self) -> List[str]:
         """Return document ids of all documents in cluster.
@@ -201,7 +209,11 @@ class Cluster:
             document_ids: A list of document ids which are contained in this cluster
         """
 
-        document_ids = [document_id for document in self.documents for document_id in document.document_ids]
+        document_ids = [
+            document_id
+            for document in self.documents
+            for document_id in document.document_ids
+        ]
         return document_ids
 
     def size(self) -> int:
@@ -240,7 +252,9 @@ class ClusteringModel:
 
         # add featurized_datum to document
         if document_tokens not in self.documents:
-            self.documents[document_tokens] = Document(document_tokens, featurized_datum["embedding"])
+            self.documents[document_tokens] = Document(
+                document_tokens, featurized_datum["embedding"]
+            )
         document = self.documents[document_tokens]
         document.document_ids.append(featurized_datum["id"])
         document.raw_texts.append(featurized_datum["text"])
@@ -250,7 +264,9 @@ class ClusteringModel:
         for document in self.documents.values():
             document.weight = len(document.document_ids)
 
-    def set_convergence_limits(self, convergence_patience: int, convergence_improvement_threshold: float) -> None:
+    def set_convergence_limits(
+        self, convergence_patience: int, convergence_improvement_threshold: float
+    ) -> None:
         """Set the criteria for establishing convergence and stopping the clustering algorithm.
 
         Args:

@@ -218,7 +218,7 @@ def main():
     args.job_seeds = seeds_for_job  # add all seeds as list attr so will be written to aggregate results
     del args.job_seed  # this attribute was only relevant for individual jobs
     process_and_write_aggregate_results(aggregate_metrics, aggregate_stats, configuration, args, dataset_id)
-    logger.info("Successful completion of clustering!")
+    logger.info(f"Clustering Complete! Wrote results to directory='{args.output_dir}' with dataset_id='{dataset_id}'")
 
 
 if __name__ == "__main__":
