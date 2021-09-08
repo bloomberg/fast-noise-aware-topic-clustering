@@ -37,7 +37,7 @@ class GenericPreprocessor(ABC):
         Importantly, each featurized data point must contain the following fields:
             - `id`: a unique identifier associated with each data point
             - `text`: the raw input text
-            - `clustering_tokens`: the (preprocessed) tokens that will be input to clustering
+            - `clustering_tokens`: the final tokens that will be input to clustering
             - `embedding`: the embedding associated with the data point.
 
         Args:
