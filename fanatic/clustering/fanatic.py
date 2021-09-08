@@ -305,7 +305,7 @@ class FanaticClusterModel(ClusteringModel):
 
         # go through documents in batches
         for i in range(0, n_documents, batch_size):
-            document_keys_batch = document_keys[i : i + batch_size]
+            document_keys_batch = document_keys[i: i + batch_size]
             document_vectors_batch = [
                 self.documents[document_key].vector
                 for document_key in document_keys_batch
