@@ -52,15 +52,15 @@ The `data/subreddit_labels.json` labels file can be substituted for a different 
 
 #### Clustering Outputs
 After a successful clustering run, the files that are output are:
-- `fanatic_<dataset-id>_<seed-run>_labels_and_assignments.json`: this file is generated for each seed run and contains, for each document, the *assignment* (what cluster the document ended up in) and *label* (the label associated with the document). This contains the full clustering result for downstream analysis.
+- `fanatic_<dataset-id>_<seed-run>_labels_and_assignments.json`: this file is generated for each seed run and contains, for each document-id, the *assignment* (what cluster the document ended up in) and *label* (the label associated with the document). Therefore, the full clustering result is contained within this file for downstream analysis. Document-ids can be mapped back to the original datafile should additional metadata be desired. 
 - `fanatic_<dataset-id>_<seed-run>_sample_clusters.txt` - this file is generated for each seed run and contains the first 10 documents from each cluster and associated label. Format is `<text> -> <label>`. This gives the user a qualitative sense of what each cluster contains.
 - `fanatic_<dataset-id>_<seed-run>_summary.txt` - this file is generated for each seed run and contains all input parameters and clustering stats/metrics. It is effectively a summary of the entire clustering run, allowing you to quickly parse results and/or recreate the job if needed. It can be consumed by [configparser](https://docs.python.org/3.7/library/configparser.html).
 - `fanatic_<dataset-id>_summary_averaged.txt` - this file is generated once for a dataset-id and contains the input arguments and *averaged* clustering stats/metrics across the seed runs. 
 
-In addition, the full clustering model can be dumped to pickle for deep investigation if desired by adding `--flag-save-clusteringmodel`. *Warning*: especially for large datasets, this file becomes huge.
+In addition, the full clustering model can be dumped via pickle for deeper investigation by adding `--flag-save-clusteringmodel`. *Warning*: this file can become large, especially for big datasets.
 
 ### Custom Preprocessor / Featurizer
-Results from the paper were generated using an in-house preprocessor that is not available to the public. Using nltk we created a very similar preprocessor, located at `fanatic/preprocess/nltk_preprocessor.py`, and inherits from `fanatic/preprocess/generic_preprocessor.py`. Users are free to create their own custom preprocessors that inherit from `generic_preprocessor.py` and experiment with more sophisticated features (e.g. BERT embeddings). See `generic_preprocessor.py` for additional documentation and requirements.
+Results from the paper were generated using an in-house preprocessor that is not available to the public. Using nltk we created a very similar preprocessor, located at `fanatic/preprocess/nltk_preprocessor.py`, and inherits from `fanatic/preprocess/generic_preprocessor.py`. Users are free to create their own custom preprocessors that also inherit from `generic_preprocessor.py` and experiment with more sophisticated features (e.g. BERT embeddings). See `generic_preprocessor.py` for additional documentation and requirements.
 
 ### Non-Reddit Datasets
 Users are encouraged to substitute or modify `fanatic/preprocess/read_data.py` to read in different kinds of data. In particular, `DATASET_INPUT_FIELD`, `DATASET_LABEL_FIELD` and `DATASET_ID_FIELD` must be changed to extract the relevant content from the new dataset for downstream preprocessing and clustering. 
