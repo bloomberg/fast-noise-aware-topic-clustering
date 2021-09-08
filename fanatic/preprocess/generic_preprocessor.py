@@ -16,7 +16,9 @@ from typing import Any, Dict, Generator, List
 class GenericPreprocessor(ABC):
     """Generic interface for preprocessing data."""
 
-    def preprocess(self, data: List[Dict[str, Any]]) -> Generator[Dict[str, Any], None, None]:
+    def preprocess(
+        self, data: List[Dict[str, Any]]
+    ) -> Generator[Dict[str, Any], None, None]:
         """Preprocess the documents.
         'norm_tokens' field must be present in output if using the embedding_driver.py to train a Word2Vec model.
 
@@ -28,7 +30,9 @@ class GenericPreprocessor(ABC):
         """
         raise NotImplementedError
 
-    def featurize(self, data_generator: Generator[Dict[str, Any], None, None]) -> Generator[Dict[str, Any], None, None]:
+    def featurize(
+        self, data: List[Dict[str, Any]]
+    ) -> Generator[Dict[str, Any], None, None]:
         """Featurize the data. This function is directly called by clustering_driver.py.
         Importantly, each featurized data point must contain the following fields:
             - `id`: a unique identifier associated with each data point

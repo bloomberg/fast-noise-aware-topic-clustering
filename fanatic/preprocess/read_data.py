@@ -16,7 +16,9 @@ from typing import Any, Dict, List, Optional
 
 import zstandard as zstd
 
-logging_format = "%(asctime)s %(filename)s %(funcName)s %(lineno)d %(levelname)s %(message)s"
+logging_format = (
+    "%(asctime)s %(filename)s %(funcName)s %(lineno)d %(levelname)s %(message)s"
+)
 logging.basicConfig(level=logging.INFO, format=logging_format)
 logger = logging.getLogger(__name__)
 
@@ -75,13 +77,18 @@ def read_file(
                     try:
                         json_line = json.loads(line)
                         title = str(
-                            json_line[DATASET_INPUT_FIELD].encode(encoding="UTF-8", errors="strict").decode("UTF-8")
+                            json_line[DATASET_INPUT_FIELD]
+                            .encode(encoding="UTF-8", errors="strict")
+                            .decode("UTF-8")
                         )
                         label = json_line[DATASET_LABEL_FIELD]
                         id = json_line[DATASET_ID_FIELD]
 
                         # if provided, restrict data universe to labels in subreddit_labels_list
-                        if subreddit_labels_list is not None and label not in subreddit_labels_list:
+                        if (
+                            subreddit_labels_list is not None
+                            and label not in subreddit_labels_list
+                        ):
                             continue
 
                         # filter out very short titles

@@ -56,9 +56,13 @@ def filter_data_by_noise_percentage(
 
     # calculate number of coherent/noise titles you require based on how coherent many docs were *actually* read
     n_coherent_docs = len(coherent_indices)
-    n_required_coherent_titles = int(num_docs_read - subreddit_noise_percentage * num_docs_read)
+    n_required_coherent_titles = int(
+        num_docs_read - subreddit_noise_percentage * num_docs_read
+    )
     n_required_noise_titles = num_docs_read - n_required_coherent_titles
-    n_required_noise_titles = min(max(n_required_noise_titles, 0), num_docs_read)  # avoid potential off-by-1 errors
+    n_required_noise_titles = min(
+        max(n_required_noise_titles, 0), num_docs_read
+    )  # avoid potential off-by-1 errors
     if n_required_coherent_titles > n_coherent_docs:
         logger.warning(
             f"Not enough actual coherent documents to fulfill num_docs_read={num_docs_read} "
@@ -68,7 +72,9 @@ def filter_data_by_noise_percentage(
         )
         n_required_coherent_titles = n_coherent_docs
         n_required_noise_titles = int(
-            n_required_coherent_titles * subreddit_noise_percentage / (1 - subreddit_noise_percentage)
+            n_required_coherent_titles
+            * subreddit_noise_percentage
+            / (1 - subreddit_noise_percentage)
         )
 
     # select required number of coherent/noise docs
@@ -85,7 +91,9 @@ def filter_data_by_noise_percentage(
         coherent_subreddit_names,
         coherent_indices,
     )
-    _add_data_to_filtered_set(filtered_data, counts_by_label, noise_data, noise_subreddit_names, noise_indices)
+    _add_data_to_filtered_set(
+        filtered_data, counts_by_label, noise_data, noise_subreddit_names, noise_indices
+    )
 
     # log some stats
     n_coherent_titles = len(coherent_indices)

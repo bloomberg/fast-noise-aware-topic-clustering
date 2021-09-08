@@ -11,7 +11,7 @@
 
 import logging
 import re
-from typing import Any, Dict, Generator, List, Optional
+from typing import Any, Dict, Generator, List, Optional, Set
 
 import numpy as np
 from gensim.models import KeyedVectors
@@ -20,7 +20,9 @@ from nltk.tokenize import RegexpTokenizer
 
 from fanatic.preprocess.generic_preprocessor import GenericPreprocessor
 
-logging_format = "%(asctime)s %(filename)s %(funcName)s %(lineno)d %(levelname)s %(message)s"
+logging_format = (
+    "%(asctime)s %(filename)s %(funcName)s %(lineno)d %(levelname)s %(message)s"
+)
 logging.basicConfig(level=logging.INFO, format=logging_format)
 logger = logging.getLogger(__name__)
 
@@ -28,13 +30,17 @@ NUM_RE = re.compile(r"\d+[A-Za-z]{,2}")
 
 
 class NLTKPreprocessor(GenericPreprocessor):
-    def __init__(self, embedding_model_file: Optional[str] = None, min_valid_tokens: int = 3):
+    def __init__(
+        self, embedding_model_file: Optional[str] = None, min_valid_tokens: int = 3
+    ):
         # https://www.nltk.org/api/nltk.tokenize.html
         self.tokenizer = RegexpTokenizer(r"\w+")
         self.stopwords = stopwords.words("english")
         self.min_valid_tokens = min_valid_tokens
         if embedding_model_file is not None:
-            self.embedding_model = KeyedVectors.load_word2vec_format(embedding_model_file, binary=False)
+            self.embedding_model = KeyedVectors.load_word2vec_format(
+                embedding_model_file, binary=False
+            )
         else:
             self.embedding_model = None
             logger.warning(
@@ -42,7 +48,9 @@ class NLTKPreprocessor(GenericPreprocessor):
             )
         super().__init__()
 
-    def preprocess(self, data: List[Dict[str, Any]]) -> Generator[Dict[str, Any], None, None]:
+    def preprocess(
+        self, data: List[Dict[str, Any]]
+    ) -> Generator[Dict[str, Any], None, None]:
         """Preprocess the data.
 
         Args:
@@ -55,15 +63,17 @@ class NLTKPreprocessor(GenericPreprocessor):
             text = d["text"]
             d["tokens"] = [tok for tok in self.tokenizer.tokenize(text.lower())]
             d["norm_tokens"] = [
-                "__NUMBER__" if NUM_RE.match(tok) else tok for tok in d["tokens"] if tok not in self.stopwords
+                "__NUMBER__" if NUM_RE.match(tok) else tok
+                for tok in d["tokens"]
+                if tok not in self.stopwords
             ]
             yield d
 
-    def _get_averaged_embedding(self, clustering_tokens: List[str]) -> np.ndarray:
+    def _get_averaged_embedding(self, clustering_tokens: Set[str]) -> np.ndarray:
         """Get an embedding for each token, and the perform a simple average to get sentence-embedding.
 
         Args:
-            clustering_tokens: the list of tokens to be embedded
+            clustering_tokens: the set of tokens to be embedded
 
         Returns:
             averaged_vector: the sentence-embedding.
@@ -89,13 +99,17 @@ class NLTKPreprocessor(GenericPreprocessor):
             )
 
         for d in preprocessed_data_generator:
-            embedding_tokens = [tok for tok in d["norm_tokens"] if tok in self.embedding_model]
+            embedding_tokens = set(
+                [tok for tok in d["norm_tokens"] if tok in self.embedding_model]
+            )
             if len(embedding_tokens) >= self.min_valid_tokens:
                 d["clustering_tokens"] = embedding_tokens
                 d["embedding"] = self._get_averaged_embedding(embedding_tokens)
                 yield d
 
-    def featurize(self, data: List[Dict[str, Any]]) -> Generator[Dict[str, Any], None, None]:
+    def featurize(
+        self, data: List[Dict[str, Any]]
+    ) -> Generator[Dict[str, Any], None, None]:
         """Combination of preprocess and embed. Generates the required fields for downstream clustering:
             `id`, `text`, `clustering_tokens`, `embedding`.
 

@@ -1,5 +1,4 @@
-# FANATIC
-FAst Noise-Aware TopIc Clustering
+# FANATIC: FAst Noise-Aware TopIc Clustering
 
 Authors: Ari Silburt, Anja Subasic, Evan Thompson, Carmeline Dsilva, Tarec Fares
 
@@ -8,8 +7,8 @@ This repo contains the research code and scripts used in the Silburt et al. (202
 
 In particular, this repo allows a user to:
 - Download the reddit data
-- Train a (word2vec) embedding model
-- Use `FANATIC` to cluster the reddit data, dumping results for downstream analysis. 
+- Train a word2vec embedding model
+- Use `FANATIC` to cluster the reddit data and dump results for downstream analysis. 
 
 Note that the original paper results used an in-house preprocessor, but a very similar open-source one has been provided (see `fanatic/preprocess/nltk_preprocessor.py`).
 

@@ -25,7 +25,9 @@ def _restricted_float(input_value: str) -> float:
     try:
         x = float(input_value)
     except ValueError:
-        raise argparse.ArgumentTypeError("%r not a floating-point literal" % (input_value,))
+        raise argparse.ArgumentTypeError(
+            "%r not a floating-point literal" % (input_value,)
+        )
 
     if x < 0.0 or x > 1.0:
         raise argparse.ArgumentTypeError("%r not in range [0.0, 1.0]" % (x,))
@@ -76,13 +78,13 @@ def parse_args() -> argparse.Namespace:
         "--subreddit-labels-file",
         type=_optional_string,
         default="data/subreddit_labels.json",
-        help='file location of annotation labels.'
+        help="file location of annotation labels."
         "`None` ignores an external labels file and uses the subreddit as the label",
     )
     parser.add_argument(
         "--subreddit-noise-percentage",
         type=_optional_restricted_float,
-        default=0.2,
+        default=0.5,
         help='controls the percentage of "noise"/("coherent" + "noise") documents in the data. '
         "Requires --subreddit-labels-file argument to be specified. "
         "If set to `None`, the noise percentage is set by the natural data distribution.",
@@ -113,13 +115,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--clustering-lambda",
         type=float,
-        default=0.45,
+        default=0.324,
         help="Clustering lambda threshold",
     )
     parser.add_argument(
         "--token-probability-threshold",
         type=_restricted_float,
-        default=0.01,
+        default=0.0128,
         help="Minimum token probability required to add a document to an existing cluster",
     )
     parser.add_argument(
@@ -131,10 +133,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--max-num-clusters",
         type=int,
-        default=600,
+        default=50,
         help="Maximum number of clusters allowed to be created",
     )
-    parser.add_argument("--min-cluster-size", type=int, default=50, help="Minimum cluster size")
+    parser.add_argument(
+        "--min-cluster-size", type=int, default=50, help="Minimum cluster size"
+    )
     parser.add_argument(
         "--merge-close-clusters-max-iterations",
         type=int,
@@ -144,7 +148,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--merge-close-clusters-lambda-fraction",
         type=_restricted_float,
-        default=0.8,
+        default=0.412,
         help="Fraction of lambda for two clusters to be merged (value between 0 and 1).",
     )
     parser.add_argument(

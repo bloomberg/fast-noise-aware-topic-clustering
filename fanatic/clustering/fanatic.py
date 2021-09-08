@@ -21,7 +21,9 @@ import scipy.spatial
 
 from fanatic.clustering.clusteringcomponents import Cluster, ClusteringModel
 
-logging_format = "%(asctime)s %(filename)s %(funcName)s %(lineno)d %(levelname)s %(message)s"
+logging_format = (
+    "%(asctime)s %(filename)s %(funcName)s %(lineno)d %(levelname)s %(message)s"
+)
 logging.basicConfig(level=logging.INFO, format=logging_format)
 logger = logging.getLogger(__name__)
 
@@ -40,8 +42,12 @@ class FanaticClusterModel(ClusteringModel):
         self.token_probability_threshold = config["token_probability_threshold"]
         self.max_num_clusters = config["max_num_clusters"]
         self.distance_metric = config["distance_metric"]
-        self.merge_close_clusters_max_iterations = config["merge_close_clusters_max_iterations"]
-        self.merge_close_clusters_lambda_fraction = config["merge_close_clusters_lambda_fraction"]
+        self.merge_close_clusters_max_iterations = config[
+            "merge_close_clusters_max_iterations"
+        ]
+        self.merge_close_clusters_lambda_fraction = config[
+            "merge_close_clusters_lambda_fraction"
+        ]
         self.batch_size = config["batch_size"]
         self.min_cluster_size = config["min_cluster_size"]
         self.max_clustering_time = config["max_clustering_time"]
@@ -67,7 +73,9 @@ class FanaticClusterModel(ClusteringModel):
             cluster_vectors = np.vstack(cluster.center for cluster in self.clusters)
             for document in self.documents.values():
                 if not document.cluster:
-                    dists = scipy.spatial.distance.cdist(cluster_vectors, [document.vector], metric=distance_metric)
+                    dists = scipy.spatial.distance.cdist(
+                        cluster_vectors, [document.vector], metric=distance_metric
+                    )
                     all_idx = np.argsort(dists.flatten())
                     try:
                         idx = next(
@@ -75,7 +83,10 @@ class FanaticClusterModel(ClusteringModel):
                                 i
                                 for i in all_idx
                                 if dists[i, 0] < clustering_lambda
-                                and sum(self.clusters[i].token_probability.get(t, 0) for t in document.tokens)
+                                and sum(
+                                    self.clusters[i].token_probability.get(t, 0)
+                                    for t in document.tokens
+                                )
                                 / float(len(document.tokens))
                                 >= token_probability_threshold
                             )
@@ -106,7 +117,9 @@ class FanaticClusterModel(ClusteringModel):
                     document.cluster = None
                     document.cluster_id = None
                 cluster.documents.clear()
-        self.clusters = [cluster for cluster in self.clusters if len(cluster.documents) > 0]
+        self.clusters = [
+            cluster for cluster in self.clusters if len(cluster.documents) > 0
+        ]
 
     def detect_and_merge_clusters(
         self,
@@ -139,7 +152,10 @@ class FanaticClusterModel(ClusteringModel):
         merge_iterations = 0
         n_clusters_merged_total = 0
 
-        while clusters_merged_in_last_iteration is True and merge_iterations < merge_close_clusters_max_iterations:
+        while (
+            clusters_merged_in_last_iteration is True
+            and merge_iterations < merge_close_clusters_max_iterations
+        ):
             n_clusters_merged = 0
             merge_clusters_iteration_start_time = time.time()
 
@@ -147,19 +163,31 @@ class FanaticClusterModel(ClusteringModel):
             clusters_merged_in_last_iteration = False
             merge_iterations += 1
             n_clusters = len(cluster_vectors)
-            cluster_indices_altered = set()  # keeps track of cluster indices that have been involved in a merge
-            cluster_ids_to_remove = set()  # keeps track of cluster ids that will be removed
+            cluster_indices_altered = (
+                set()
+            )  # keeps track of cluster indices that have been involved in a merge
+            cluster_ids_to_remove = (
+                set()
+            )  # keeps track of cluster ids that will be removed
 
             # calculate distances
-            dists = scipy.spatial.distance.pdist(cluster_vectors, metric=distance_metric)
+            dists = scipy.spatial.distance.pdist(
+                cluster_vectors, metric=distance_metric
+            )
             dists_indices = list(combinations(range(n_clusters), 2))
             all_idx = np.argsort(dists)
             for idx in all_idx:
-                if dists[idx] < clustering_lambda * merge_close_clusters_lambda_fraction:
+                if (
+                    dists[idx]
+                    < clustering_lambda * merge_close_clusters_lambda_fraction
+                ):
                     index_i, index_j = dists_indices[idx]
 
                     # make sure cluster has not already been altered, only one merge allowed per while loop
-                    if index_i not in cluster_indices_altered and index_j not in cluster_indices_altered:
+                    if (
+                        index_i not in cluster_indices_altered
+                        and index_j not in cluster_indices_altered
+                    ):
                         # merge clusters - weighted average based off number of inquiries in cluster in past iteration
                         len_inqs_i = self.clusters[index_i].size()
                         len_inqs_j = self.clusters[index_j].size()
@@ -168,9 +196,9 @@ class FanaticClusterModel(ClusteringModel):
 
                         # NOTE: now cluster_vectors[i] != clusters_i.center, but this is okay since there is only one
                         # merge allowed per cluster per while loop... then they are synced up again
-                        self.clusters[index_i].center = (weight_i * self.clusters[index_i].center) + (
-                            weight_j * self.clusters[index_j].center
-                        )
+                        self.clusters[index_i].center = (
+                            weight_i * self.clusters[index_i].center
+                        ) + (weight_j * self.clusters[index_j].center)
 
                         # keep track of indices
                         cluster_ids_to_remove.add(self.clusters[index_j].cluster_id)
@@ -185,7 +213,11 @@ class FanaticClusterModel(ClusteringModel):
             n_clusters_merged_total += n_clusters_merged
 
             # remove clusters that were merged, remake cluster_vectors array
-            self.clusters = [cluster for cluster in self.clusters if cluster.cluster_id not in cluster_ids_to_remove]
+            self.clusters = [
+                cluster
+                for cluster in self.clusters
+                if cluster.cluster_id not in cluster_ids_to_remove
+            ]
             cluster_vectors = np.vstack(cluster.center for cluster in self.clusters)
             logger.info(
                 f"Merged {n_clusters_merged} clusters in iteration {merge_iterations} took "
@@ -208,7 +240,9 @@ class FanaticClusterModel(ClusteringModel):
             cluster_vectors: array of cluster centers
         """
         # filter out empty clusters
-        self.clusters = [cluster for cluster in self.clusters if len(cluster.documents) > 0]
+        self.clusters = [
+            cluster for cluster in self.clusters if len(cluster.documents) > 0
+        ]
 
         # get cluster weights
         n_inquiries_per_cluster = []
@@ -217,7 +251,9 @@ class FanaticClusterModel(ClusteringModel):
             for document in cluster.documents:
                 n_inquiries_in_cluster += len(document.document_ids)
             n_inquiries_per_cluster.append(n_inquiries_in_cluster)
-        cluster_weights = np.asarray(n_inquiries_per_cluster) / np.sum(n_inquiries_per_cluster)
+        cluster_weights = np.asarray(n_inquiries_per_cluster) / np.sum(
+            n_inquiries_per_cluster
+        )
 
         # get old/new cluster centers
         old_cluster_vectors = np.vstack(cluster.center for cluster in self.clusters)
@@ -228,7 +264,8 @@ class FanaticClusterModel(ClusteringModel):
         # calculate weighted cluster center change
         cluster_center_change = np.sum(
             [
-                cluster_weights[i] * np.linalg.norm(cluster_vectors[i] - old_cluster_vectors[i])
+                cluster_weights[i]
+                * np.linalg.norm(cluster_vectors[i] - old_cluster_vectors[i])
                 for i in range(cluster_vectors.shape[0])
             ]
         )
@@ -268,28 +305,42 @@ class FanaticClusterModel(ClusteringModel):
 
         # go through documents in batches
         for i in range(0, n_documents, batch_size):
-            document_keys_batch = document_keys[i: i + batch_size]
-            document_vectors_batch = [self.documents[document_key].vector for document_key in document_keys_batch]
+            document_keys_batch = document_keys[i : i + batch_size]
+            document_vectors_batch = [
+                self.documents[document_key].vector
+                for document_key in document_keys_batch
+            ]
 
             # find distances of all documents to clusters in batch
-            dists_batch = scipy.spatial.distance.cdist(document_vectors_batch, cluster_vectors, metric=distance_metric)
+            dists_batch = scipy.spatial.distance.cdist(
+                document_vectors_batch, cluster_vectors, metric=distance_metric
+            )
             filter_idx_batch = (
                 dists_batch < clustering_lambda
             )  # boolean 2D array filtering out < clustering_lambda
             for j, document_key in enumerate(document_keys_batch):
-                dists_below_lamda = dists_batch[j][filter_idx_batch[j]]  # keep only dists < lambda
-                cluster_idx_below_lamda = cluster_idx[filter_idx_batch[j]]  # and get corresponding cluster indices
+                dists_below_lamda = dists_batch[j][
+                    filter_idx_batch[j]
+                ]  # keep only dists < lambda
+                cluster_idx_below_lamda = cluster_idx[
+                    filter_idx_batch[j]
+                ]  # and get corresponding cluster indices
                 sorted_dummy_idx = np.argsort(
                     dists_below_lamda.flatten()
                 )  # sort indices by distance, yields "dummy" indices
-                all_idx = cluster_idx_below_lamda[sorted_dummy_idx]  # map dummy to original cluster idx again
+                all_idx = cluster_idx_below_lamda[
+                    sorted_dummy_idx
+                ]  # map dummy to original cluster idx again
                 document = self.documents[document_key]
                 try:
                     idx = next(
                         (
                             k
                             for k in all_idx
-                            if sum(self.clusters[k].token_probability.get(t, 0) for t in document.tokens)
+                            if sum(
+                                self.clusters[k].token_probability.get(t, 0)
+                                for t in document.tokens
+                            )
                             / float(len(document.tokens))
                             >= token_probability_threshold
                         )
@@ -373,7 +424,9 @@ class FanaticClusterModel(ClusteringModel):
                 dists = scipy.spatial.distance.cdist(
                     cluster_vectors, [document.vector], metric=self.distance_metric
                 ).flatten()
-                (filter_idx,) = np.where(dists < self.clustering_lambda)  # filter by lambda
+                (filter_idx,) = np.where(
+                    dists < self.clustering_lambda
+                )  # filter by lambda
                 all_idx = filter_idx[np.argsort(dists[filter_idx])]
                 try:
                     # filter by token probability
@@ -381,7 +434,10 @@ class FanaticClusterModel(ClusteringModel):
                         (
                             i
                             for i in all_idx
-                            if sum(self.clusters[i].token_probability.get(t, 0) for t in document.tokens)
+                            if sum(
+                                self.clusters[i].token_probability.get(t, 0)
+                                for t in document.tokens
+                            )
                             / float(len(document.tokens))
                             >= self.token_probability_threshold
                         )
@@ -418,7 +474,9 @@ class FanaticClusterModel(ClusteringModel):
                 cluster_center_change,
                 cluster_vectors,
             ) = self.filter_and_recalculate_cluster_centers()
-            logger.info("Change in cluster centers (weighted): {}".format(cluster_center_change))
+            logger.info(
+                "Change in cluster centers (weighted): {}".format(cluster_center_change)
+            )
 
             # check for convergence
             if self.check_convergence(cluster_center_change) is True:
@@ -457,15 +515,27 @@ class FanaticClusterModel(ClusteringModel):
 
         # filter out clusters that are too small
         n_clusters_before_filter = len(self.clusters)
-        logger.info("Number of clusters (pre-filtering small clusters): {}".format(n_clusters_before_filter))
+        logger.info(
+            "Number of clusters (pre-filtering small clusters): {}".format(
+                n_clusters_before_filter
+            )
+        )
         self.filter_small_clusters(self.min_cluster_size)
-        logger.info("Number of clusters (post-filtering small clusters): {}".format(len(self.clusters)))
+        logger.info(
+            "Number of clusters (post-filtering small clusters): {}".format(
+                len(self.clusters)
+            )
+        )
         n_clusters_diff_filtering = n_clusters_before_filter - len(self.clusters)
         logger.info("Number of clusters Filtered: {}".format(n_clusters_diff_filtering))
 
         # reassign documents that were filtered out if they can be potentially assigned an existing cluster
         logger.info("Reassigning documents")
-        self.reassign_documents(self.clustering_lambda, self.token_probability_threshold, self.distance_metric)
+        self.reassign_documents(
+            self.clustering_lambda,
+            self.token_probability_threshold,
+            self.distance_metric,
+        )
 
         # cluster stats object
         self.stats["cluster_time"] = time.time() - start_time

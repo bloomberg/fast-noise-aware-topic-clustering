@@ -74,7 +74,11 @@ def prepare_final_dataset_and_labels(
         for title in subreddit_data:
             # if we have annotations available, use them to get a more informed label,
             # otherwise use the subreddit as the label
-            derived_label = subreddit_labels[subreddit] if subreddit_labels is not None else subreddit
+            derived_label = (
+                subreddit_labels[subreddit]
+                if subreddit_labels is not None
+                else subreddit
+            )
 
             # prepare title / label
             final_derived_labels[title["id"]] = derived_label
